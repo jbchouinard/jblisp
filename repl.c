@@ -7,7 +7,6 @@
 
 #include "mpc.h"
 
-
 int count_nodes(mpc_ast_t* ast) {
 	if (ast->children_num == 0)
         return 1;
@@ -21,48 +20,31 @@ int count_nodes(mpc_ast_t* ast) {
     return 0;
 }
 
+double eval_op(char* op, double x, double y) {
+    if (strcmp(op, "+") == 0) return x + y;
+    else if (strcmp(op, "-") == 0) return x - y;
+    else if (strcmp(op, "*") == 0) return x * y;
+    else if (strcmp(op, "/") == 0) return x / y;
+    else return NAN;
+}
+
 double eval_ast(mpc_ast_t* ast) {
-    if (ast->children_num) {
-        if (strstr(ast->tag, "expr")) {
-            char* op = ast->children[1]->contents;
-            if (strcmp(op, "+") == 0) {
-                double total = 0;
-                for (int i=2; i < (ast->children_num - 1); i++) {
-                    total += eval_ast(ast->children[i]);
-                }
-                return total;
-            } else if (strcmp(op, "*") == 0) {
-                double total = 1;
-                for (int i=2; i < (ast->children_num - 1); i++) {
-                    total *= eval_ast(ast->children[i]);
-                }
-                return total;
-            } else if (strcmp(op, "-") == 0) {
-                double total = eval_ast(ast->children[2]);
-                for (int i=3; i < (ast->children_num - 1); i++) {
-                    total -= eval_ast(ast->children[i]);
-                }
-                return total;
-            } else if (strcmp(op, "/") == 0) {
-                double total = eval_ast(ast->children[2]);
-                for (int i=3; i < (ast->children_num - 1); i++) {
-                    total /= eval_ast(ast->children[i]);
-                }
-                return total;
-            } else {
-                return NAN;
-            }
-        } else {
-            // Must be root node, evaluate expr
-            return eval_ast(ast->children[1]);
-        }
+
+    if(strstr(ast->tag, "number"))
+        return atof(ast->contents);
+    
+    if (strstr(ast->tag, "expr")) {
+        char* op = ast->children[1]->contents;
+        double x = eval_ast(ast->children[2]);
+
+        for (int i=3; i < (ast->children_num - 1); i++)
+            x = eval_op(op, x, eval_ast(ast->children[i]));
+
+        return x;
     }
     else {
-        if (strstr(ast->tag, "number")) {
-            return atof(ast->contents);
-        } else {
-            return NAN;
-        }
+        // Must be root node, evaluate expr
+        return eval_ast(ast->children[1]);
     }
 }
 
@@ -91,7 +73,6 @@ int main(int argc, char** argv) {
         // Parse input
         add_history(input);
         if (mpc_parse("<stdin>", input, JBLisp, &res)) {
-            mpc_ast_print(res.output);
             mpc_ast_t* a = res.output;
             printf("%f\n", eval_ast(a));
             mpc_ast_delete(res.output);
