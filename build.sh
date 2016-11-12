@@ -1,1 +1,1 @@
-gcc -Wall repl.c -o build/repl -I/usr/include -L/usr/lib -lreadline
+gcc -Wall mpc.c repl.c -o build/repl -I/usr/include -L/usr/lib -leditline -lm
