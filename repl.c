@@ -1,11 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include <editline/readline.h>
 #include <editline/history.h>
 
 #include "mpc.h"
+
+int RIGHT = 0;
+int LEFT = 1;
 
 int count_nodes(mpc_ast_t* ast) {
 	if (ast->children_num == 0)
@@ -25,6 +29,7 @@ double eval_op(char* op, double x, double y) {
     else if (strcmp(op, "-") == 0) return x - y;
     else if (strcmp(op, "*") == 0) return x * y;
     else if (strcmp(op, "/") == 0) return x / y;
+    else if (strcmp(op, "^") == 0) return pow(x, y);
     else return NAN;
 }
 
@@ -34,12 +39,22 @@ double eval_ast(mpc_ast_t* ast) {
         return atof(ast->contents);
     
     if (strstr(ast->tag, "expr")) {
+        double x;
+        int assoc;
         char* op = ast->children[1]->contents;
-        double x = eval_ast(ast->children[2]);
 
-        for (int i=3; i < (ast->children_num - 1); i++)
-            x = eval_op(op, x, eval_ast(ast->children[i]));
+        if (strcmp(op, "^") == 0) assoc = RIGHT;
+        else assoc = LEFT;
 
+        if (assoc == LEFT) {
+            x = eval_ast(ast->children[2]);
+            for (int i=3; i < (ast->children_num - 1); i++)
+                x = eval_op(op, x, eval_ast(ast->children[i]));
+        } else {
+            x = eval_ast(ast->children[(ast->children_num - 2)]);
+            for (int i=(ast->children_num - 3); i > 1; i--)
+                x = eval_op(op, eval_ast(ast->children[i]), x);
+        }
         return x;
     }
     else {
@@ -52,16 +67,16 @@ int main(int argc, char** argv) {
     mpc_parser_t* Number    = mpc_new("number");
     mpc_parser_t* Operator  = mpc_new("operator");
     mpc_parser_t* Expr      = mpc_new("expr");
-    mpc_parser_t* JBLisp    = mpc_new("jblisp");
+    mpc_parser_t* Statement = mpc_new("statement");
 
     mpca_lang(MPCA_LANG_DEFAULT,
         "                                                                     \
             number      : /-?[0-9]+([.][0-9]+)?/ ;                            \
-            operator    : '+' | '-' | '/' | '*' ;                             \
+            operator    : '+' | '-' | '/' | '*' | '^' ;                       \
             expr        : <number> | '(' <operator> <expr> <expr>+ ')' ;      \
-            jblisp      : /^/ <expr> /$/ ;                                    \
+            statement   : /^/ <expr> /$/ ;                                    \
         ",
-        Number, Operator, Expr, JBLisp
+        Number, Operator, Expr, Statement
     );
 
     puts("jblisp version 0.1.0");
@@ -72,7 +87,7 @@ int main(int argc, char** argv) {
         char* input = readline("jblisp> ");
         // Parse input
         add_history(input);
-        if (mpc_parse("<stdin>", input, JBLisp, &res)) {
+        if (mpc_parse("<stdin>", input, Statement, &res)) {
             mpc_ast_t* a = res.output;
             printf("%f\n", eval_ast(a));
             mpc_ast_delete(res.output);
