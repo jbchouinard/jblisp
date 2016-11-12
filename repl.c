@@ -30,6 +30,14 @@ double eval_op(char* op, double x, double y) {
     else if (strcmp(op, "*") == 0) return x * y;
     else if (strcmp(op, "/") == 0) return x / y;
     else if (strcmp(op, "^") == 0) return pow(x, y);
+    else if (strcmp(op, "min") == 0) {
+        if (x > y) return y;
+        else return x;
+    }
+    else if (strcmp(op, "max") == 0) {
+        if (x > y) return x;
+        else return y;
+    }
     else return NAN;
 }
 
@@ -55,6 +63,8 @@ double eval_ast(mpc_ast_t* ast) {
             for (int i=(ast->children_num - 3); i > 1; i--)
                 x = eval_op(op, eval_ast(ast->children[i]), x);
         }
+        if (strcmp(op, "-") == 0 && ast->children_num == 4)
+            x = 0 - x;
         return x;
     }
     else {
@@ -72,8 +82,8 @@ int main(int argc, char** argv) {
     mpca_lang(MPCA_LANG_DEFAULT,
         "                                                                     \
             number      : /-?[0-9]+([.][0-9]+)?/ ;                            \
-            operator    : '+' | '-' | '/' | '*' | '^' ;                       \
-            expr        : <number> | '(' <operator> <expr> <expr>+ ')' ;      \
+            operator    : '+' | '-' | '/' | '*' | '^' | \"min\" | \"max\" ;   \
+            expr        : <number> | '(' <operator> <expr>+ ')' ;             \
             statement   : /^/ <expr> /$/ ;                                    \
         ",
         Number, Operator, Expr, Statement
