@@ -87,8 +87,8 @@ void lval_del(lval* v) {
 
 lval* lval_add(lval* p, lval* c) {
     p->count++;
-    if (p->count > p->size) {
-        p->size = p->size * 2 || 1;
+    if (p->count >= p->size) {
+        p->size = p->size == 0 ? 1 : p->size * 2;
         p->val.cell = realloc(p->val.cell, sizeof(lval*) * p->size);
     }
     p->val.cell[p->count-1] = c;
@@ -355,7 +355,6 @@ int main(int argc, char** argv) {
     puts("Press ^C to exit\n");
 
     while (1) {
-
         char* input = readline("jblisp> ");
         add_history(input);
 
