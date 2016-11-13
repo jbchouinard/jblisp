@@ -8,11 +8,9 @@
 
 #include "mpc.h"
 
-typedef enum { LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM, LVAL_SEXPR } ltype;
-
 // Lisp Value (lval) type
 typedef struct lval {
-    ltype type;
+    enum { LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM, LVAL_SEXPR } type;
     int count;
     int size;
     union {
@@ -88,13 +86,9 @@ void lval_del(lval* v) {
 }
 
 lval* lval_add(lval* p, lval* c) {
-    if (p->size == 0) {
-        p->val.cell = malloc(sizeof(lval*));
-        p->size = 1;
-    }
     p->count++;
     if (p->count > p->size) {
-        p->size = p->size * 2;
+        p->size = p->size * 2 || 1;
         p->val.cell = realloc(p->val.cell, sizeof(lval*) * p->size);
     }
     p->val.cell[p->count-1] = c;
@@ -174,120 +168,168 @@ void lval_println(lval* v) {
     putchar('\n');
 }
 
-int count_nodes(mpc_ast_t* ast) {
-	if (ast->children_num == 0)
-        return 1;
-    else {
-        int total = 1;
-        for (int i = 0; i < ast->children_num; i++) {
-            total += count_nodes(ast->children[i]);
-        }
-        return total;
+lval* lval_pop(lval* v, int n) {
+    lval* result = v->val.cell[n];
+    for (int i=n+1; i < v->count; i++) {
+        v->val.cell[i-1] = v->val.cell[i];
     }
-    return 0;
+    v->count--;
+    v->val.cell[v->count] = NULL;
+    return result;
 }
 
-lval* eval_op(char* op, lval* x, lval* y) {
-    if (x->type == LVAL_ERR) return x;
-    if (y->type == LVAL_ERR) return y;
-    if (x->type != y->type) {
-        if (x->type == LVAL_LNG)
-            x = lval_dbl(x->val.lng);
-        if (y->type == LVAL_LNG)
-            y = lval_dbl(y->val.lng);
+lval* lval_take(lval* v, int n) {
+    lval* result = NULL;
+    for (int i=0; i < v->count; i++) {
+        if (i == n)
+            result = v->val.cell[i];
+        else
+            lval_del(v->val.cell[i]);
     }
-
-    if (x->type == LVAL_DBL) {
-        if (strcmp(op, "+") == 0) return lval_dbl(x->val.dbl + y->val.dbl);
-        else if (strcmp(op, "-") == 0) return lval_dbl(x->val.dbl - y->val.dbl);
-        else if (strcmp(op, "*") == 0) return lval_dbl(x->val.dbl * y->val.dbl);
-        else if (strcmp(op, "/") == 0) return lval_dbl(x->val.dbl / y->val.dbl);
-        else if (strcmp(op, "^") == 0) return lval_dbl(pow(x->val.dbl, y->val.dbl));
-        else if (strcmp(op, "min") == 0) {
-            if (x->val.dbl > y->val.dbl) return y;
-            else return x;
-        }
-        else if (strcmp(op, "max") == 0) {
-            if (x->val.dbl > y->val.dbl) return x;
-            else return y;
-        }
-        else if (strcmp(op, "and") == 0) {
-            if (x->val.dbl == 0) return x;
-            else return y;
-        }
-        else if (strcmp(op, "or") == 0) {
-            if (x->val.dbl != 0) return x;
-            else return y;
-        }
-        else if (strcmp(op, "%") == 0) return lval_err("bad type");
-        else return lval_err("bad operator");
-    } else if (x->type == LVAL_LNG) {
-        if (strcmp(op, "+") == 0) return lval_lng(x->val.lng + y->val.lng);
-        else if (strcmp(op, "-") == 0) return lval_lng(x->val.lng - y->val.lng);
-        else if (strcmp(op, "*") == 0) return lval_lng(x->val.lng * y->val.lng);
-        else if (strcmp(op, "/") == 0) return lval_lng(x->val.lng / y->val.lng);
-        else if (strcmp(op, "^") == 0) return lval_lng(pow(x->val.lng, y->val.lng));
-        else if (strcmp(op, "min") == 0) {
-            if (x->val.lng > y->val.lng) return y;
-            else return x;
-        }
-        else if (strcmp(op, "max") == 0) {
-            if (x->val.lng > y->val.lng) return x;
-            else return y;
-        }
-        else if (strcmp(op, "and") == 0) {
-            if (x->val.lng == 0) return x;
-            else return y;
-        }
-        else if (strcmp(op, "or") == 0) {
-            if (x->val.lng != 0) return x;
-            else return y;
-        }
-        else if (strcmp(op, "%") == 0) return lval_lng(x->val.lng % y->val.lng);
-        else return lval_err("bad operator");
-    } else {
-        return lval_err("type error");
-    }
+    free(v->val.cell);
+    free(v);
+    return result;
 }
 
-lval* eval_ast(mpc_ast_t* ast) {
 
-    if (strstr(ast->tag, "number")) {
-        errno = 0;
-        if (strstr(ast->contents, ".")){
-            double x = strtod(ast->contents, NULL);
-            return errno != ERANGE ? lval_dbl(x) : lval_err("invalid number");
-        } else {
-            long x = strtol(ast->contents, NULL, 10);
-            return errno != ERANGE ? lval_lng(x) : lval_err("invalid number");
+lval* lval_eval_sexpr(lval*);
+lval* builtin_op(lval*, char*);
+
+lval* lval_eval(lval* v) {
+    if (v->type == LVAL_SEXPR)
+        return lval_eval_sexpr(v);
+    else
+        return v;
+}
+
+lval* lval_eval_sexpr(lval* v) {
+    for (int i=0; i < v->count; i++)
+        v->val.cell[i] = lval_eval(v->val.cell[i]);
+
+    if (v->count == 0)
+        return v;
+
+    if (v->count == 1)
+        return lval_take(v, 0);
+
+    lval* op = lval_pop(v, 0);
+    if (op->type != LVAL_SYM) {
+        lval_del(op);
+        lval_del(v);
+        return lval_err("Excepted symbol at start of S expression.");
+    }
+
+    lval* result = builtin_op(v, op->val.sym);
+    lval_del(op);
+    return result;
+}
+
+lval* lval_to_dbl(lval* v) {
+    switch (v->type) {
+        case LVAL_DBL:
+            break;
+        case LVAL_LNG:
+            v->type = LVAL_DBL;
+            v->val.dbl = (double) v->val.lng;
+            break;
+        default:
+            lval_del(v);
+            v = lval_err("type error");
+            break;
+    }
+    return v;
+}
+
+lval* builtin_op(lval* a, char* op) {
+    if (a->type == LVAL_ERR) return a;
+
+    int type = LVAL_LNG;
+    for (int i=0; i < a->count; i++) {
+        if (a->val.cell[i]->type == LVAL_LNG)
+            continue;
+        else if (a->val.cell[i]->type == LVAL_DBL)
+            type = LVAL_DBL;
+        else {
+            lval_del(a);
+            return lval_err("cannot operate on non-number.");
+        }
+    }
+
+    if (type == LVAL_DBL) {
+        for (int i=0; i < a->count; i++) {
+            a->val.cell[i] = lval_to_dbl(a->val.cell[i]);
         }
     }
     
-    if (strstr(ast->tag, "expr")) {
-        lval* x;
-        int assoc;
-        char* op = ast->children[1]->contents;
+    int assoc;
+    if (strcmp(op, "^") == 0) assoc = ASSOC_RIGHT;
+    else                      assoc = ASSOC_LEFT;
 
-        if (strcmp(op, "^") == 0) assoc = ASSOC_RIGHT;
-        else assoc = ASSOC_LEFT;
+    lval* x;
+    if (assoc == ASSOC_LEFT) x = lval_pop(a, 0);
+    else                     x = lval_pop(a, a->count-1);
 
-        if (assoc == ASSOC_LEFT) {
-            x = eval_ast(ast->children[2]);
-            for (int i=3; i < (ast->children_num - 1); i++)
-                x = eval_op(op, x, eval_ast(ast->children[i]));
+    while (a->count > 0) {
+        lval* y;
+        if (assoc == ASSOC_LEFT) y = lval_pop(a, 0);
+        else                     y = lval_pop(a, a->count-1);
+
+        if (type == LVAL_DBL) {
+            if (strcmp(op, "+") == 0) x->val.dbl += y->val.dbl;
+            else if (strcmp(op, "-") == 0) x->val.dbl -= y->val.dbl;
+            else if (strcmp(op, "*") == 0) x->val.dbl *= y->val.dbl;
+            else if (strcmp(op, "/") == 0) x->val.dbl /= y->val.dbl;
+            else if (strcmp(op, "^") == 0) x->val.dbl = pow(y->val.dbl, x->val.dbl);
+            else if (strcmp(op, "min") == 0) {
+                if (x->val.dbl > y->val.dbl) x->val.dbl = y->val.dbl;
+            }
+            else if (strcmp(op, "max") == 0) {
+                if (x->val.dbl < y->val.dbl) x->val.dbl = y->val.dbl;
+            }
+            else if (strcmp(op, "and") == 0) {
+                if (x->val.dbl != 0) x->val.dbl = y->val.dbl;
+            }
+            else if (strcmp(op, "or") == 0) {
+                if (x->val.dbl == 0) x->val.dbl = y->val.dbl;
+            }
+            else {
+                lval_del(x); lval_del(y);
+                x = lval_err("bad operator for type DOUBLE");
+                break;
+            }
+        } else if (type == LVAL_LNG) {
+            if (strcmp(op, "+") == 0) x->val.lng += y->val.lng;
+            else if (strcmp(op, "-") == 0) x->val.lng -= y->val.lng;
+            else if (strcmp(op, "*") == 0) x->val.lng *= y->val.lng;
+            else if (strcmp(op, "/") == 0) x->val.lng /= y->val.lng;
+            else if (strcmp(op, "^") == 0) x->val.lng = pow(y->val.lng, x->val.lng);
+            else if (strcmp(op, "min") == 0) {
+                if (x->val.dbl > y->val.dbl) x->val.dbl = y->val.dbl;
+            }
+            else if (strcmp(op, "max") == 0) {
+                if (x->val.lng < y->val.lng) x->val.lng = y->val.lng;
+            }
+            else if (strcmp(op, "and") == 0) {
+                if (x->val.lng != 0) x->val.lng = y->val.lng;
+            }
+            else if (strcmp(op, "or") == 0) {
+                if (x->val.lng == 0) x->val.lng = y->val.lng;
+            }
+            else if (strcmp(op, "%") == 0) x->val.lng %= y->val.lng;
+            else {
+                lval_del(x); lval_del(y);
+                y = lval_err("bad operator for type LONG");
+                break;
+            }
         } else {
-            x = eval_ast(ast->children[(ast->children_num - 2)]);
-            for (int i=(ast->children_num - 3); i > 1; i--)
-                x = eval_op(op, eval_ast(ast->children[i]), x);
+            lval_del(x); lval_del(y);
+            x = lval_err("type error");
+            break;
         }
-        if (strcmp(op, "-") == 0 && ast->children_num == 4)
-            x = eval_op("-", lval_lng(0), x);
-        return x;
+        lval_del(y);
     }
-    else {
-        // Must be root node, evaluate expr
-        return eval_ast(ast->children[1]);
-    }
+    lval_del(a);
+    return x;
 }
 
 int main(int argc, char** argv) {
@@ -309,19 +351,17 @@ int main(int argc, char** argv) {
         Number, Symbol, Sexpr, Expr, JBLisp
     );
 
-    puts("jblisp version 0.1.0");
+    puts("jblisp version 0.2.0");
     puts("Press ^C to exit\n");
 
-    mpc_result_t res;
     while (1) {
+
         char* input = readline("jblisp> ");
-        // Parse input
         add_history(input);
+
+        mpc_result_t res;
         if (mpc_parse("<stdin>", input, JBLisp, &res)) {
-            // mpc_ast_t* a = res.output;
-            // mpc_ast_print(a);
-            // println_lval(eval_ast(a));
-            lval* x = lval_read(res.output);
+            lval* x = lval_eval(lval_read(res.output));
             lval_println(x);
             lval_del(x);
             mpc_ast_delete(res.output);
