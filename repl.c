@@ -22,7 +22,7 @@ typedef struct lval {
     } val;
 } lval;
 
-// Operator association types
+// Operator associativity types
 enum { ASSOC_RIGHT, ASSOC_LEFT };
 
 lval* lval_dbl(double x) {
@@ -67,20 +67,20 @@ lval* lval_sym(char* s) {
 void lval_del(lval* v) {
     switch(v->type) {
         case LVAL_DBL:
-        break;
+            break;
         case LVAL_LNG:
-        break;
+            break;
         case LVAL_ERR:
             free(v->val.err);
-        break;
+            break;
         case LVAL_SYM:
             free(v->val.sym);
-        break;
+            break;
         case LVAL_SEXPR:
             for (int i=0; i < v->count; i++)
                 lval_del(v->val.cell[i]);
             free(v->val.cell);
-        break;
+            break;
     }
     free(v);
 }
@@ -168,6 +168,7 @@ void lval_println(lval* v) {
     putchar('\n');
 }
 
+// Pop content of a cell
 lval* lval_pop(lval* v, int n) {
     lval* result = v->val.cell[n];
     for (int i=n+1; i < v->count; i++) {
@@ -178,6 +179,7 @@ lval* lval_pop(lval* v, int n) {
     return result;
 }
 
+// Take content of a cell, deleting the parent lval
 lval* lval_take(lval* v, int n) {
     lval* result = NULL;
     for (int i=0; i < v->count; i++) {
@@ -240,27 +242,80 @@ lval* lval_to_dbl(lval* v) {
     return v;
 }
 
+lval* builtin_op_dbl(lval* x, lval* y, char* op) {
+    if (strcmp(op, "+") == 0) x->val.dbl += y->val.dbl;
+    else if (strcmp(op, "-") == 0) x->val.dbl -= y->val.dbl;
+    else if (strcmp(op, "*") == 0) x->val.dbl *= y->val.dbl;
+    else if (strcmp(op, "/") == 0) x->val.dbl /= y->val.dbl;
+    else if (strcmp(op, "^") == 0) x->val.dbl = pow(y->val.dbl, x->val.dbl);
+    else if (strcmp(op, "min") == 0) {
+        if (x->val.dbl > y->val.dbl) x->val.dbl = y->val.dbl;
+    }
+    else if (strcmp(op, "max") == 0) {
+        if (x->val.dbl < y->val.dbl) x->val.dbl = y->val.dbl;
+    }
+    else if (strcmp(op, "and") == 0) {
+        if (x->val.dbl != 0) x->val.dbl = y->val.dbl;
+    }
+    else if (strcmp(op, "or") == 0) {
+        if (x->val.dbl == 0) x->val.dbl = y->val.dbl;
+    }
+    else {
+        lval_del(x);
+        x = lval_err("bad operator for type DOUBLE");
+    }
+    lval_del(y);
+    return x;
+}
+
+lval* builtin_op_lng(lval* x, lval* y, char* op) {
+    if (strcmp(op, "+") == 0) x->val.lng += y->val.lng;
+    else if (strcmp(op, "-") == 0) x->val.lng -= y->val.lng;
+    else if (strcmp(op, "*") == 0) x->val.lng *= y->val.lng;
+    else if (strcmp(op, "/") == 0) x->val.lng /= y->val.lng;
+    else if (strcmp(op, "^") == 0) x->val.lng = pow(y->val.lng, x->val.lng);
+    else if (strcmp(op, "min") == 0) {
+        if (x->val.dbl > y->val.dbl) x->val.dbl = y->val.dbl;
+    }
+    else if (strcmp(op, "max") == 0) {
+        if (x->val.lng < y->val.lng) x->val.lng = y->val.lng;
+    }
+    else if (strcmp(op, "and") == 0) {
+        if (x->val.lng != 0) x->val.lng = y->val.lng;
+    }
+    else if (strcmp(op, "or") == 0) {
+        if (x->val.lng == 0) x->val.lng = y->val.lng;
+    }
+    else if (strcmp(op, "%") == 0) x->val.lng %= y->val.lng;
+    else {
+        lval_del(x);
+        y = lval_err("bad operator for type LONG");
+    }
+    lval_del(y);
+    return x;
+}
+
 lval* builtin_op(lval* a, char* op) {
+
     if (a->type == LVAL_ERR) return a;
 
+    // If any operand is a double, cast all to double
     int type = LVAL_LNG;
     for (int i=0; i < a->count; i++) {
-        if (a->val.cell[i]->type == LVAL_LNG)
-            continue;
-        else if (a->val.cell[i]->type == LVAL_DBL)
+        if (a->val.cell[i]->type == LVAL_DBL)
             type = LVAL_DBL;
-        else {
+        else if (a->val.cell[i]->type != LVAL_LNG) {
             lval_del(a);
             return lval_err("cannot operate on non-number.");
         }
     }
-
     if (type == LVAL_DBL) {
         for (int i=0; i < a->count; i++) {
             a->val.cell[i] = lval_to_dbl(a->val.cell[i]);
         }
     }
-    
+
+    // Set associativity rule
     int assoc;
     if (strcmp(op, "^") == 0) assoc = ASSOC_RIGHT;
     else                      assoc = ASSOC_LEFT;
@@ -269,64 +324,32 @@ lval* builtin_op(lval* a, char* op) {
     if (assoc == ASSOC_LEFT) x = lval_pop(a, 0);
     else                     x = lval_pop(a, a->count-1);
 
+    // (- x) = -x
+    if ((strcmp(op, "-") == 0) && a->count == 0) {
+        switch (type) {
+            case LVAL_DBL:
+                x = builtin_op_dbl(lval_dbl(0.0), x, op);
+                break;
+            case LVAL_LNG:
+                x = builtin_op_lng(lval_lng(0.0), x , op);
+                break;
+        }
+    }
+
     while (a->count > 0) {
         lval* y;
         if (assoc == ASSOC_LEFT) y = lval_pop(a, 0);
         else                     y = lval_pop(a, a->count-1);
 
-        if (type == LVAL_DBL) {
-            if (strcmp(op, "+") == 0) x->val.dbl += y->val.dbl;
-            else if (strcmp(op, "-") == 0) x->val.dbl -= y->val.dbl;
-            else if (strcmp(op, "*") == 0) x->val.dbl *= y->val.dbl;
-            else if (strcmp(op, "/") == 0) x->val.dbl /= y->val.dbl;
-            else if (strcmp(op, "^") == 0) x->val.dbl = pow(y->val.dbl, x->val.dbl);
-            else if (strcmp(op, "min") == 0) {
-                if (x->val.dbl > y->val.dbl) x->val.dbl = y->val.dbl;
-            }
-            else if (strcmp(op, "max") == 0) {
-                if (x->val.dbl < y->val.dbl) x->val.dbl = y->val.dbl;
-            }
-            else if (strcmp(op, "and") == 0) {
-                if (x->val.dbl != 0) x->val.dbl = y->val.dbl;
-            }
-            else if (strcmp(op, "or") == 0) {
-                if (x->val.dbl == 0) x->val.dbl = y->val.dbl;
-            }
-            else {
-                lval_del(x); lval_del(y);
-                x = lval_err("bad operator for type DOUBLE");
+        switch (type) {
+            case LVAL_DBL:
+                x = builtin_op_dbl(x, y, op);
                 break;
-            }
-        } else if (type == LVAL_LNG) {
-            if (strcmp(op, "+") == 0) x->val.lng += y->val.lng;
-            else if (strcmp(op, "-") == 0) x->val.lng -= y->val.lng;
-            else if (strcmp(op, "*") == 0) x->val.lng *= y->val.lng;
-            else if (strcmp(op, "/") == 0) x->val.lng /= y->val.lng;
-            else if (strcmp(op, "^") == 0) x->val.lng = pow(y->val.lng, x->val.lng);
-            else if (strcmp(op, "min") == 0) {
-                if (x->val.dbl > y->val.dbl) x->val.dbl = y->val.dbl;
-            }
-            else if (strcmp(op, "max") == 0) {
-                if (x->val.lng < y->val.lng) x->val.lng = y->val.lng;
-            }
-            else if (strcmp(op, "and") == 0) {
-                if (x->val.lng != 0) x->val.lng = y->val.lng;
-            }
-            else if (strcmp(op, "or") == 0) {
-                if (x->val.lng == 0) x->val.lng = y->val.lng;
-            }
-            else if (strcmp(op, "%") == 0) x->val.lng %= y->val.lng;
-            else {
-                lval_del(x); lval_del(y);
-                y = lval_err("bad operator for type LONG");
+            case LVAL_LNG:
+                x = builtin_op_lng(x, y, op);
                 break;
-            }
-        } else {
-            lval_del(x); lval_del(y);
-            x = lval_err("type error");
-            break;
         }
-        lval_del(y);
+        if (x->type == LVAL_ERR) break;
     }
     lval_del(a);
     return x;
@@ -341,7 +364,7 @@ int main(int argc, char** argv) {
 
     mpca_lang(MPCA_LANG_DEFAULT,
         "                                                                     \
-            number      : /[0-9]*[.][0-9]+/ | /[0-9]+[.]?/ ;                  \
+            number      : /-?[0-9]*[.][0-9]+/ | /-?[0-9]+[.]?/ ;              \
             symbol      : '+' | '-' | '/' | '*' | '^' | \"min\" | \"max\" |   \
                           \"and\" | \"or\" | '%' ;                            \
             sexpr       : '(' <expr>* ')' ;                                   \
@@ -351,7 +374,7 @@ int main(int argc, char** argv) {
         Number, Symbol, Sexpr, Expr, JBLisp
     );
 
-    puts("jblisp version 0.2.0");
+    puts("jblisp version 0.2.1");
     puts("Press ^C to exit\n");
 
     while (1) {
