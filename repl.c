@@ -12,6 +12,23 @@
 #define LASSERT(args, cond, err) \
     if (!(cond)) { lval_del(args); return lval_err(err); }
 
+// Lisp Value (lval) type
+struct lval {
+    enum { LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR } type;
+    int count;
+    int size;
+    union {
+        double dbl;
+        long lng;
+        char* err;
+        char* sym;
+        struct lval** cell;
+    } val;
+};
+
+// Operator associativity types
+enum { ASSOC_RIGHT, ASSOC_LEFT };
+
 lval* lval_dbl(double x) {
     lval* v = malloc(sizeof(lval));
     v->type = LVAL_DBL;
