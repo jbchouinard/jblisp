@@ -436,6 +436,30 @@ lval* builtin_last(lval* a) {
     return lval_take(x, x->count-1);
 }
 
+// cadr, cdar, caar, etc.
+lval* builtin_c__r(lval* a, char* func) {
+    int len = strlen(func);
+    LASSERT(a, len > 2,
+        "Unknown builtin function");
+    LASSERT(a, func[0] == 'c' && func[len-1] == 'r',
+        "Unknown builtin function");
+
+    for (int i = len-2; i > 0; i--) {
+        if (func[i] == 'a')
+            a = builtin_car(a);
+        else if (func[i] == 'd')
+            a = builtin_cdr(a);
+        else {
+            lval_del(a);
+            return lval_err("Unknown builtin funcion");
+        }
+        lval* x = lval_sexpr();
+        a = lval_add(x, a);
+    }
+    return lval_take(a, 0);
+}
+
+
 lval* builtin(lval* a, char* func) {
     if (strcmp("list", func) == 0) return builtin_list(a);
     if (strcmp("join", func) == 0) return builtin_join(a);
@@ -450,8 +474,7 @@ lval* builtin(lval* a, char* func) {
     if (strcmp("or", func) == 0) return builtin_op(a, func);
     if (strcmp("not", func) == 0) return builtin_op(a, func);
     if (strstr("^+-/*%", func)) return builtin_op(a, func);
-    lval_del(a);
-    return lval_err("Unknown builtin function.");
+    return builtin_c__r(a, func);
 }
 
 lval* lval_eval_sexpr(lval* v) {
@@ -496,8 +519,8 @@ int main(int argc, char** argv) {
             number   : /-?[0-9]*[.][0-9]+/ | /-?[0-9]+[.]?/ ;                 \
             symbol   : '+' | '-' | '/' | '*' | '^' | '%' |                    \
                        \"min\" | \"max\" | \"and\" | \"or\" |                 \
-                       \"list\" | \"car\" | \"cdr\" | \"join\" | \"eval\" |   \
-                       \"cons\" | \"len\" | \"init\" ;                        \
+                       \"list\" |  \"join\" | \"eval\" | \"last\" |           \
+                       \"cons\" | \"len\" | \"init\" | /c[ad]+r/ ;            \
             sexpr    : '(' <expr>* ')' ;                                      \
             qexpr    : '{' <expr>* '}' ;                                      \
             expr     : <number> | <symbol> | <sexpr> | <qexpr> ;              \
