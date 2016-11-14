@@ -82,14 +82,39 @@ void lval_del(lval* v) {
     free(v);
 }
 
-lval* lval_add(lval* p, lval* c) {
-    p->count++;
-    if (p->count >= p->size) {
-        p->size = p->size == 0 ? p->count : p->size * 2;
-        p->val.cell = realloc(p->val.cell, sizeof(lval*) * p->size);
+lval* lval_insert(lval* x, lval* v, int n) {
+    LASSERT(x, n <= x->count,
+        "Array bounds error in INSERT.");
+    x->count++;
+    if (x->count >= x->size) {
+        x->size = x->size == 0 ? x->count : x->size * 2;
+        x->val.cell = realloc(x->val.cell, sizeof(lval*) * x->size);
     }
-    p->val.cell[p->count-1] = c;
-    return p;
+    memmove(x->val.cell+n+1, x->val.cell+n, (x->count-n-1) * sizeof(lval*));
+    x->val.cell[n] = v;
+    return x;
+}
+
+lval* lval_add(lval* x, lval* v) {
+    return lval_insert(x, v, x->count);
+}
+
+lval* lval_pop(lval* v, int n) {
+    lval* res = v->val.cell[n];
+    memmove(v->val.cell+n, v->val.cell+n+1, (v->count-n-1) * sizeof(lval*));
+    v->count--;
+    if (v->size > 2 * v->count) {
+        v->val.cell = realloc(v->val.cell, sizeof(lval*) * v->count);
+        v->size = v->count;
+    }
+    return res;
+}
+
+// Take content of a cell, deleting the parent lval
+lval* lval_take(lval* v, int n) {
+    lval* res = lval_pop(v, n);
+    lval_del(v);
+    return res;
 }
 
 lval* lval_read_num(mpc_ast_t* ast) {
@@ -174,24 +199,6 @@ void lval_print(lval* v) {
 void lval_println(lval* v) {
     lval_print(v);
     putchar('\n');
-}
-
-lval* lval_pop(lval* v, int n) {
-    lval* res = v->val.cell[n];
-    memmove(v->val.cell+n, v->val.cell+n+1, (v->count-n-1) * sizeof(lval*));
-    v->count--;
-    if (v->size > 2 * v->count) {
-        v->val.cell = realloc(v->val.cell, sizeof(lval*) * v->count);
-        v->size = v->count;
-    }
-    return res;
-}
-
-// Take content of a cell, deleting the parent lval
-lval* lval_take(lval* v, int n) {
-    lval* res = lval_pop(v, n);
-    lval_del(v);
-    return res;
 }
 
 lval* lval_to_dbl(lval* v) {
@@ -322,28 +329,26 @@ lval* builtin_op(lval* a, char* op) {
     return x;
 }
 
-lval* builtin_head(lval* a) {
+lval* builtin_car(lval* a) {
     LASSERT(a, a->count == 1,
-        "Function 'head' takes exactly 1 argument.");
+        "Function 'car' takes exactly 1 argument.");
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Type Error - function 'head' expected a Q expression.");
+        "Type Error - function 'car' expected a Q expression.");
     LASSERT(a, a->val.cell[0]->count != 0,
-        "Function 'head' undefined on empty list '{}'.");
+        "Function 'car' undefined on empty list '{}'.");
 
-    // Delete all but first child
+    // Delete all but first cell
     lval* v = lval_take(a, 0);
-    while (v->count > 1)
-        lval_del(lval_pop(v, 1));
-    return v;
+    return lval_take(v, 0);
 }
 
-lval* builtin_tail(lval* a) {
+lval* builtin_cdr(lval* a) {
     LASSERT(a, a->count == 1,
-        "Function 'tail' takes exactly 1 argument.");
+        "Function 'cdr' takes exactly 1 argument.");
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Type Error - function 'tail' expected a Q expression.");
+        "Type Error - function 'cdr' expected a Q expression.");
     LASSERT(a, a->val.cell[0]->count != 0,
-        "Function 'tail' undefined on empty list '{}'.");
+        "Function 'cdr' undefined on empty list '{}'.");
 
     //Delete head
     lval* v = lval_take(a, 0);
@@ -388,13 +393,63 @@ lval* builtin_join(lval* a) {
     return x;
 }
 
+lval* builtin_cons(lval* a) {
+    LASSERT(a, a->count == 2,
+        "Function 'cons' takes exactly 2 arguments.");
+    LASSERT(a, a->val.cell[1]->type == LVAL_QEXPR,
+        "Second argument to 'cons' must be a Q expression.");
+    lval* x = lval_pop(a, 0);
+    lval* q = lval_take(a, 0);
+    q = lval_insert(q, x, 0);
+    return q;
+}
+
+lval* builtin_len(lval* a) {
+    LASSERT(a, a->count == 1,
+        "Function 'len' takes exactly 1 argument");
+    LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
+        "Function 'len' only applies to Q expressions.");
+    lval* x = lval_lng(a->val.cell[0]->count);
+    lval_del(a);
+    return x;
+}
+
+lval* builtin_init(lval* a) {
+    LASSERT(a, a->count == 1,
+        "Function 'init' takes exactly 1 argument");
+    LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
+        "Function 'init' only applies to Q expressions.");
+
+    // Keep all but first cell
+    lval* x = lval_take(a, 0);
+    lval_del(lval_pop(x, x->count-1));
+    return x;
+}
+
+lval* builtin_last(lval* a) {
+    LASSERT(a, a->count == 1,
+        "Function 'last' takes exactly 1 argument");
+    LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
+        "Function 'last' only applies to Q expressions.");
+
+    lval* x = lval_take(a, 0);
+    return lval_take(x, x->count-1);
+}
+
 lval* builtin(lval* a, char* func) {
     if (strcmp("list", func) == 0) return builtin_list(a);
-    if (strcmp("head", func) == 0) return builtin_head(a);
-    if (strcmp("tail", func) == 0) return builtin_tail(a);
     if (strcmp("join", func) == 0) return builtin_join(a);
     if (strcmp("eval", func) == 0) return builtin_eval(a);
-    if (strstr("^+-/*%andornot", func)) return builtin_op(a, func);
+    if (strcmp("cons", func) == 0) return builtin_cons(a);
+    if (strcmp("car", func) == 0) return builtin_car(a);
+    if (strcmp("cdr", func) == 0) return builtin_cdr(a);
+    if (strcmp("len", func) == 0) return builtin_len(a);
+    if (strcmp("init", func) == 0) return builtin_init(a);
+    if (strcmp("last", func) == 0) return builtin_last(a);
+    if (strcmp("and", func) == 0) return builtin_op(a, func);
+    if (strcmp("or", func) == 0) return builtin_op(a, func);
+    if (strcmp("not", func) == 0) return builtin_op(a, func);
+    if (strstr("^+-/*%", func)) return builtin_op(a, func);
     lval_del(a);
     return lval_err("Unknown builtin function.");
 }
@@ -441,7 +496,8 @@ int main(int argc, char** argv) {
             number   : /-?[0-9]*[.][0-9]+/ | /-?[0-9]+[.]?/ ;                 \
             symbol   : '+' | '-' | '/' | '*' | '^' | '%' |                    \
                        \"min\" | \"max\" | \"and\" | \"or\" |                 \
-                       \"list\" | \"head\" | \"tail\" | \"join\" | \"eval\" ; \
+                       \"list\" | \"car\" | \"cdr\" | \"join\" | \"eval\" |   \
+                       \"cons\" | \"len\" | \"init\" ;                        \
             sexpr    : '(' <expr>* ')' ;                                      \
             qexpr    : '{' <expr>* '}' ;                                      \
             expr     : <number> | <symbol> | <sexpr> | <qexpr> ;              \
