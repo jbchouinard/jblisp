@@ -508,7 +508,7 @@ lval* lval_eval_sexpr(lval* v) {
     if (op->type != LVAL_SYM) {
         lval_del(op);
         lval_del(v);
-        return lval_err("Excepted symbol at start of S expression.");
+        return lval_err("Expected symbol at start of S expression.");
     }
 
     lval* result = builtin(v, op->val.sym);
