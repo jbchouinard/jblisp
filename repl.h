@@ -32,7 +32,7 @@ lval* builtin_car(lval* a);
 lval* builtin_cdr(lval* a);
 lval* builtin_init(lval* a);
 lval* builtin_last(lval* a);
-lval* builtin_c__r(lval* a);
+lval* builtin_c__r(lval* a, char* func);
 lval* builtin(lval* a, char* func);
 lval* lval_eval_sexpr(lval* v);
 lval* lval_eval(lval* v);

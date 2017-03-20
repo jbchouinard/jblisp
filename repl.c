@@ -175,8 +175,6 @@ lval* lval_read(mpc_ast_t* ast) {
     return x;
 }
 
-void lval_print(lval*);
-
 void lval_print_expr(lval* v, char open, char close) {
     putchar(open);
     for (int i=0; i < v->count; i++) {
@@ -484,6 +482,8 @@ lval* builtin(lval* a, char* func) {
     if (strcmp("cons", func) == 0) return builtin_cons(a);
     if (strcmp("car", func) == 0) return builtin_car(a);
     if (strcmp("cdr", func) == 0) return builtin_cdr(a);
+    if (strcmp("head", func) == 0) return builtin_car(a);
+    if (strcmp("tail", func) == 0) return builtin_cdr(a);
     if (strcmp("len", func) == 0) return builtin_len(a);
     if (strcmp("init", func) == 0) return builtin_init(a);
     if (strcmp("last", func) == 0) return builtin_last(a);
@@ -537,7 +537,8 @@ int main(int argc, char** argv) {
             symbol   : '+' | '-' | '/' | '*' | '^' | '%' |                    \
                        \"min\" | \"max\" | \"and\" | \"or\" |                 \
                        \"list\" |  \"join\" | \"eval\" | \"last\" |           \
-                       \"cons\" | \"len\" | \"init\" | /c[ad]+r/ ;            \
+                       \"cons\" | \"len\" | \"init\" | \"head\" | \"tail\" |  \
+                       /c[ad]+r/ ;                                            \
             sexpr    : '(' <expr>* ')' ;                                      \
             qexpr    : '{' <expr>* '}' ;                                      \
             expr     : <number> | <symbol> | <sexpr> | <qexpr> ;              \
@@ -546,7 +547,7 @@ int main(int argc, char** argv) {
         Number, Symbol, Sexpr, Qexpr, Expr, JBLisp
     );
 
-    puts("jblisp version 0.2.1");
+    puts("jblisp version 0.2.2");
     puts("Press ^C to exit\n");
 
     while (1) {
