@@ -510,9 +510,6 @@ lval *lval_eval_sexpr(lval *v) {
     if (v->count == 0)
         return v;
 
-    if (v->count == 1)
-        return lval_take(v, 0);
-
     lval *op = lval_pop(v, 0);
     if (op->type != LVAL_SYM) {
         lval_del(op);
@@ -558,10 +555,14 @@ void exec_line(char *input) {
     mpc_result_t res;
 
     if (mpc_parse("<stdin>", input, JBLisp, &res)) {
-        lval *x = lval_eval(lval_read(res.output));
-        lval_println(x);
-        lval_del(x);
+        lval *line = lval_read(res.output);
         mpc_ast_delete(res.output);
+        while (line->count) {
+            lval *x = lval_eval(lval_pop(line, 0));
+            lval_println(x);
+            lval_del(x);
+        }
+        lval_del(line);
     } else {
         mpc_err_print(res.error);
         mpc_err_delete(res.error);
