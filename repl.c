@@ -282,7 +282,7 @@ lval *builtin_op_lng(lval *x, lval *y, char *op) {
     else if (strcmp(op, "/") == 0) x->val.lng /= y->val.lng;
     else if (strcmp(op, "^") == 0) x->val.lng = pow(y->val.lng, x->val.lng);
     else if (strcmp(op, "min") == 0) {
-        if (x->val.dbl > y->val.dbl) x->val.dbl = y->val.dbl;
+        if (x->val.lng > y->val.lng) x->val.lng = y->val.lng;
     }
     else if (strcmp(op, "max") == 0) {
         if (x->val.lng < y->val.lng) x->val.lng = y->val.lng;
@@ -499,6 +499,8 @@ lval *builtin(lval *a, char *func) {
     if (strcmp("and", func) == 0) return builtin_op(a, func);
     if (strcmp("or", func) == 0) return builtin_op(a, func);
     if (strcmp("not", func) == 0) return builtin_op(a, func);
+    if (strcmp("min", func) == 0) return builtin_op(a, func);
+    if (strcmp("max", func) == 0) return builtin_op(a, func);
     if (strstr("^+-/*%", func)) return builtin_op(a, func);
     return builtin_c__r(a, func);
 }
