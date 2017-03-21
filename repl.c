@@ -22,12 +22,12 @@
     }
 
 // Parser
-mpc_parser_t* Number;
-mpc_parser_t* Symbol;
-mpc_parser_t* Sexpr;
-mpc_parser_t* Qexpr;
-mpc_parser_t* Expr;
-mpc_parser_t* JBLisp;
+mpc_parser_t *Number;
+mpc_parser_t *Symbol;
+mpc_parser_t *Sexpr;
+mpc_parser_t *Qexpr;
+mpc_parser_t *Expr;
+mpc_parser_t *JBLisp;
 
 // Lisp Value (lval) type
 struct lval {
@@ -37,39 +37,39 @@ struct lval {
     union {
         double dbl;
         long lng;
-        char* err;
-        char* sym;
-        struct lval** cell;
+        char *err;
+        char *sym;
+        struct lval **cell;
     } val;
 };
 
 // Operator associativity types
 enum { ASSOC_RIGHT, ASSOC_LEFT };
 
-lval* lval_dbl(double x) {
-    lval* v = malloc(sizeof(lval));
+lval *lval_dbl(double x) {
+    lval *v = malloc(sizeof(lval));
     v->type = LVAL_DBL;
     v->val.dbl = x;
     return v;
 }
 
-lval* lval_lng(long x) {
-    lval* v = malloc(sizeof(lval));
+lval *lval_lng(long x) {
+    lval *v = malloc(sizeof(lval));
     v->type = LVAL_LNG;
     v->val.lng = x;
     return v;
 }
 
-lval* lval_err(char* m) {
-    lval* v = malloc(sizeof(lval));
+lval *lval_err(char *m) {
+    lval *v = malloc(sizeof(lval));
     v->type = LVAL_ERR;
     v->val.err = malloc(strlen(m) + 1);
     strcpy(v->val.err, m);
     return v;
 }
 
-lval* lval_sexpr(void) {
-    lval* v = malloc(sizeof(lval));
+lval *lval_sexpr(void) {
+    lval *v = malloc(sizeof(lval));
     v->type = LVAL_SEXPR;
     v->val.cell = NULL;
     v->count = 0;
@@ -77,8 +77,8 @@ lval* lval_sexpr(void) {
     return v;
 }
 
-lval* lval_qexpr(void) {
-    lval* v = malloc(sizeof(lval));
+lval *lval_qexpr(void) {
+    lval *v = malloc(sizeof(lval));
     v->type = LVAL_QEXPR;
     v->val.cell = NULL;
     v->count = 0;
@@ -86,15 +86,15 @@ lval* lval_qexpr(void) {
     return v;
 }
 
-lval* lval_sym(char* s) {
-    lval* v = malloc(sizeof(lval));
+lval *lval_sym(char *s) {
+    lval *v = malloc(sizeof(lval));
     v->type = LVAL_SYM;
     v->val.sym = malloc(sizeof(strlen(s) + 1));
     strcpy(v->val.sym, s);
     return v;
 }
 
-void lval_del(lval* v) {
+void lval_del(lval *v) {
     switch(v->type) {
         case LVAL_DBL:
             break;
@@ -116,42 +116,42 @@ void lval_del(lval* v) {
     free(v);
 }
 
-lval* lval_insert(lval* x, lval* v, int n) {
+lval *lval_insert(lval *x, lval *v, int n) {
     LASSERT(x, n <= x->count,
         "Array bounds error in INSERT.");
     x->count++;
     if (x->count >= x->size) {
-        x->size = x->size == 0 ? x->count : x->size * 2;
-        x->val.cell = realloc(x->val.cell, sizeof(lval*) * x->size);
+        x->size = x->size == 0 ? x->count : x->size  *2;
+        x->val.cell = realloc(x->val.cell, sizeof(lval*)  *x->size);
     }
-    memmove(x->val.cell+n+1, x->val.cell+n, (x->count-n-1) * sizeof(lval*));
+    memmove(x->val.cell+n+1, x->val.cell+n, (x->count-n-1)  *sizeof(lval*));
     x->val.cell[n] = v;
     return x;
 }
 
-lval* lval_add(lval* x, lval* v) {
+lval *lval_add(lval *x, lval *v) {
     return lval_insert(x, v, x->count);
 }
 
-lval* lval_pop(lval* v, int n) {
-    lval* res = v->val.cell[n];
-    memmove(v->val.cell+n, v->val.cell+n+1, (v->count-n-1) * sizeof(lval*));
+lval *lval_pop(lval *v, int n) {
+    lval *res = v->val.cell[n];
+    memmove(v->val.cell+n, v->val.cell+n+1, (v->count-n-1)  *sizeof(lval*));
     v->count--;
-    if (v->size > 2 * v->count) {
-        v->val.cell = realloc(v->val.cell, sizeof(lval*) * v->count);
+    if (v->size > 2  *v->count) {
+        v->val.cell = realloc(v->val.cell, sizeof(lval*)  *v->count);
         v->size = v->count;
     }
     return res;
 }
 
 // Take content of a cell, deleting the parent lval
-lval* lval_take(lval* v, int n) {
-    lval* res = lval_pop(v, n);
+lval *lval_take(lval *v, int n) {
+    lval *res = lval_pop(v, n);
     lval_del(v);
     return res;
 }
 
-lval* lval_read_num(mpc_ast_t* ast) {
+lval *lval_read_num(mpc_ast_t *ast) {
     errno = 0;
     if (strstr(ast->contents, ".")) {
         double x = strtod(ast->contents, NULL);
@@ -162,13 +162,13 @@ lval* lval_read_num(mpc_ast_t* ast) {
     }
 }
 
-lval* lval_read(mpc_ast_t* ast) {
+lval *lval_read(mpc_ast_t *ast) {
     if (strstr(ast->tag, "number"))
         return lval_read_num(ast);
     if (strstr(ast->tag, "symbol"))
         return lval_sym(ast->contents);
 
-    lval* x = NULL;
+    lval *x = NULL;
     if (strcmp(ast->tag, ">") == 0 || strstr(ast->tag, "sexpr"))
         x = lval_sexpr();
     else if (strstr(ast->tag, "qexpr"))
@@ -192,7 +192,7 @@ lval* lval_read(mpc_ast_t* ast) {
     return x;
 }
 
-void lval_print_expr(lval* v, char open, char close) {
+void lval_print_expr(lval *v, char open, char close) {
     putchar(open);
     for (int i=0; i < v->count; i++) {
         lval_print(v->val.cell[i]);
@@ -202,7 +202,7 @@ void lval_print_expr(lval* v, char open, char close) {
     putchar(close);
 }
 
-void lval_print(lval* v) {
+void lval_print(lval *v) {
     switch (v->type) {
         case LVAL_LNG:
             printf("%li", v->val.lng);
@@ -228,12 +228,12 @@ void lval_print(lval* v) {
     }
 }
 
-void lval_println(lval* v) {
+void lval_println(lval *v) {
     lval_print(v);
     putchar('\n');
 }
 
-lval* lval_to_dbl(lval* v) {
+lval *lval_to_dbl(lval *v) {
     switch (v->type) {
         case LVAL_DBL:
             break;
@@ -249,7 +249,7 @@ lval* lval_to_dbl(lval* v) {
     return v;
 }
 
-lval* builtin_op_dbl(lval* x, lval* y, char* op) {
+lval *builtin_op_dbl(lval *x, lval *y, char *op) {
     if (strcmp(op, "+") == 0) x->val.dbl += y->val.dbl;
     else if (strcmp(op, "-") == 0) x->val.dbl -= y->val.dbl;
     else if (strcmp(op, "*") == 0) x->val.dbl *= y->val.dbl;
@@ -275,7 +275,7 @@ lval* builtin_op_dbl(lval* x, lval* y, char* op) {
     return x;
 }
 
-lval* builtin_op_lng(lval* x, lval* y, char* op) {
+lval *builtin_op_lng(lval *x, lval *y, char *op) {
     if (strcmp(op, "+") == 0) x->val.lng += y->val.lng;
     else if (strcmp(op, "-") == 0) x->val.lng -= y->val.lng;
     else if (strcmp(op, "*") == 0) x->val.lng *= y->val.lng;
@@ -302,7 +302,7 @@ lval* builtin_op_lng(lval* x, lval* y, char* op) {
     return x;
 }
 
-lval* builtin_op(lval* a, char* op) {
+lval *builtin_op(lval *a, char *op) {
     if (a->type == LVAL_ERR) return a;
 
     // If any operand is a double, cast all to double
@@ -326,7 +326,7 @@ lval* builtin_op(lval* a, char* op) {
     if (strcmp(op, "^") == 0) assoc = ASSOC_RIGHT;
     else                      assoc = ASSOC_LEFT;
 
-    lval* x;
+    lval *x;
     if (assoc == ASSOC_LEFT) x = lval_pop(a, 0);
     else                     x = lval_pop(a, a->count-1);
 
@@ -343,7 +343,7 @@ lval* builtin_op(lval* a, char* op) {
     }
 
     while (a->count > 0) {
-        lval* y;
+        lval *y;
         if (assoc == ASSOC_LEFT) y = lval_pop(a, 0);
         else                     y = lval_pop(a, a->count-1);
 
@@ -361,7 +361,7 @@ lval* builtin_op(lval* a, char* op) {
     return x;
 }
 
-lval* builtin_car(lval* a) {
+lval *builtin_car(lval *a) {
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Type Error - function 'car' expected a Q expression.");
     LASSERTARGC("car", 1, a->count)
@@ -369,11 +369,11 @@ lval* builtin_car(lval* a) {
         "Function 'car' undefined on empty list '{}'.");
 
     // Delete all but first cell
-    lval* v = lval_take(a, 0);
+    lval *v = lval_take(a, 0);
     return lval_take(v, 0);
 }
 
-lval* builtin_cdr(lval* a) {
+lval *builtin_cdr(lval *a) {
     LASSERTARGC("cdr", 1, a->count)
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Type Error - function 'cdr' expected a Q expression.");
@@ -381,29 +381,29 @@ lval* builtin_cdr(lval* a) {
         "Function 'cdr' undefined on empty list '{}'.");
 
     //Delete head
-    lval* v = lval_take(a, 0);
+    lval *v = lval_take(a, 0);
     lval_del(lval_pop(v, 0));
     return v;
 }
 
-lval* builtin_list(lval* a) {
+lval *builtin_list(lval *a) {
     LASSERT(a, a->type == LVAL_SEXPR,
         "Function 'list' expected an S expression");
     a->type = LVAL_QEXPR;
     return a;
 }
 
-lval* builtin_eval(lval* a) {
+lval *builtin_eval(lval *a) {
     LASSERTARGC("eval", 1, a->count);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Function 'eval' expected a Q expression");
 
-    lval* x = lval_take(a, 0);
+    lval *x = lval_take(a, 0);
     x->type = LVAL_SEXPR;
     return lval_eval(x);
 }
 
-lval* builtin_join(lval* a) {
+lval *builtin_join(lval *a) {
     LASSERT(a, a->count != 0,
         "Function 'join' takes at least 1 argument.");
     for (int i=0; i < a->count; i++) {
@@ -411,9 +411,9 @@ lval* builtin_join(lval* a) {
             "Function 'join' takes only Q expression arguments.");
     }
 
-    lval* x = lval_pop(a, 0);
+    lval *x = lval_pop(a, 0);
     while (a->count) {
-        lval* y = lval_pop(a, 0);
+        lval *y = lval_pop(a, 0);
         while (y->count)
             x = lval_add(x, lval_pop(y, 0));
         lval_del(y);
@@ -422,47 +422,47 @@ lval* builtin_join(lval* a) {
     return x;
 }
 
-lval* builtin_cons(lval* a) {
+lval *builtin_cons(lval *a) {
     LASSERTARGC("cons", 2, a->count);
     LASSERT(a, a->val.cell[1]->type == LVAL_QEXPR,
         "Second argument to 'cons' must be a Q expression.");
-    lval* x = lval_pop(a, 0);
-    lval* q = lval_take(a, 0);
+    lval *x = lval_pop(a, 0);
+    lval *q = lval_take(a, 0);
     q = lval_insert(q, x, 0);
     return q;
 }
 
-lval* builtin_len(lval* a) {
+lval *builtin_len(lval *a) {
     LASSERTARGC("len", 1, a->count);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Function 'len' only applies to Q expressions.");
-    lval* x = lval_lng(a->val.cell[0]->count);
+    lval *x = lval_lng(a->val.cell[0]->count);
     lval_del(a);
     return x;
 }
 
-lval* builtin_init(lval* a) {
+lval *builtin_init(lval *a) {
     LASSERTARGC("init", 1, a->count);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Function 'init' only applies to Q expressions.");
 
     // Keep all but first cell
-    lval* x = lval_take(a, 0);
+    lval *x = lval_take(a, 0);
     lval_del(lval_pop(x, x->count-1));
     return x;
 }
 
-lval* builtin_last(lval* a) {
+lval *builtin_last(lval *a) {
     LASSERTARGC("last", 1, a->count);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Function 'last' only applies to Q expressions.");
 
-    lval* x = lval_take(a, 0);
+    lval *x = lval_take(a, 0);
     return lval_take(x, x->count-1);
 }
 
 // cadr, cdar, caar, etc.
-lval* builtin_c__r(lval* a, char* func) {
+lval *builtin_c__r(lval *a, char *func) {
     int len = strlen(func);
     LASSERT(a, len > 2,
         "Unknown builtin function");
@@ -478,14 +478,13 @@ lval* builtin_c__r(lval* a, char* func) {
             lval_del(a);
             return lval_err("Unknown builtin funcion");
         }
-        lval* x = lval_sexpr();
+        lval *x = lval_sexpr();
         a = lval_add(x, a);
     }
     return lval_take(a, 0);
 }
 
-
-lval* builtin(lval* a, char* func) {
+lval *builtin(lval *a, char *func) {
     if (strcmp("list", func) == 0) return builtin_list(a);
     if (strcmp("join", func) == 0) return builtin_join(a);
     if (strcmp("eval", func) == 0) return builtin_eval(a);
@@ -504,7 +503,7 @@ lval* builtin(lval* a, char* func) {
     return builtin_c__r(a, func);
 }
 
-lval* lval_eval_sexpr(lval* v) {
+lval *lval_eval_sexpr(lval *v) {
     for (int i=0; i < v->count; i++)
         v->val.cell[i] = lval_eval(v->val.cell[i]);
 
@@ -514,34 +513,34 @@ lval* lval_eval_sexpr(lval* v) {
     if (v->count == 1)
         return lval_take(v, 0);
 
-    lval* op = lval_pop(v, 0);
+    lval *op = lval_pop(v, 0);
     if (op->type != LVAL_SYM) {
         lval_del(op);
         lval_del(v);
         return lval_err("Expected symbol at start of S expression.");
     }
 
-    lval* result = builtin(v, op->val.sym);
+    lval *result = builtin(v, op->val.sym);
     lval_del(op);
     return result;
 }
 
-lval* lval_eval(lval* v) {
+lval *lval_eval(lval *v) {
     if (v->type == LVAL_SEXPR)
         return lval_eval_sexpr(v);
     else
         return v;
 }
 
-void exec_file(char* filename) {
+void exec_file(char *filename) {
     mpc_result_t res;
 
     printf("Loading file '%s'...", filename);
     if (mpc_parse_contents(filename, JBLisp, &res)) {
-        lval* prog = lval_read(res.output);
+        lval *prog = lval_read(res.output);
         mpc_ast_delete(res.output);
         while (prog->count) {
-            lval* x = lval_eval(lval_pop(prog, 0));
+            lval *x = lval_eval(lval_pop(prog, 0));
             if (x->type == LVAL_ERR) {
                 lval_println(x);
             }
@@ -555,11 +554,11 @@ void exec_file(char* filename) {
     puts("done.");
 }
 
-void exec_line(char* input) {
+void exec_line(char *input) {
     mpc_result_t res;
 
     if (mpc_parse("<stdin>", input, JBLisp, &res)) {
-        lval* x = lval_eval(lval_read(res.output));
+        lval *x = lval_eval(lval_read(res.output));
         lval_println(x);
         lval_del(x);
         mpc_ast_delete(res.output);
@@ -569,7 +568,7 @@ void exec_line(char* input) {
     }
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     Number    = mpc_new("number");
     Symbol    = mpc_new("symbol");
     Sexpr     = mpc_new("sexpr");
@@ -585,10 +584,10 @@ int main(int argc, char** argv) {
                        \"list\" |  \"join\" | \"eval\" | \"last\" |           \
                        \"cons\" | \"len\" | \"init\" | \"head\" | \"tail\" |  \
                        /c[ad]+r/ ;                                            \
-            sexpr    : '(' <expr>* ')' ;                                      \
-            qexpr    : '{' <expr>* '}' ;                                      \
+            sexpr    : '(' <expr> *')' ;                                      \
+            qexpr    : '{' <expr> *'}' ;                                      \
             expr     : <number> | <symbol> | <sexpr> | <qexpr> ;              \
-            jblisp   : /^/ <expr>* /$/ ;                                      \
+            jblisp   : /^/ <expr> */$/ ;                                      \
         ",
         Number, Symbol, Sexpr, Qexpr, Expr, JBLisp
     );
@@ -601,7 +600,7 @@ int main(int argc, char** argv) {
     }
 
     while (1) {
-        char* input = readline("jblisp> ");
+        char *input = readline("jblisp> ");
         add_history(input);
         exec_line(input);
         free(input);
