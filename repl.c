@@ -12,6 +12,15 @@
 #define LASSERT(args, cond, err) \
     if (!(cond)) { lval_del(args); return lval_err(err); }
 
+#define LASSERTARGC(fname, exp, argc)                                          \
+    char msg[100];                                                             \
+    if (argc != exp) {                                                         \
+        snprintf(msg, (size_t) 100,                                            \
+                 "Function '%s' expected %i argument(s), got %i.",             \
+                 fname, exp, argc);                                            \
+        return lval_err(msg);                                                  \
+    }
+
 // Lisp Value (lval) type
 struct lval {
     enum { LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR } type;
@@ -345,10 +354,9 @@ lval* builtin_op(lval* a, char* op) {
 }
 
 lval* builtin_car(lval* a) {
-    LASSERT(a, a->count == 1,
-        "Function 'car' takes exactly 1 argument.");
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Type Error - function 'car' expected a Q expression.");
+    LASSERTARGC("car", 1, a->count)
     LASSERT(a, a->val.cell[0]->count != 0,
         "Function 'car' undefined on empty list '{}'.");
 
@@ -358,8 +366,7 @@ lval* builtin_car(lval* a) {
 }
 
 lval* builtin_cdr(lval* a) {
-    LASSERT(a, a->count == 1,
-        "Function 'cdr' takes exactly 1 argument.");
+    LASSERTARGC("cdr", 1, a->count)
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Type Error - function 'cdr' expected a Q expression.");
     LASSERT(a, a->val.cell[0]->count != 0,
@@ -379,10 +386,9 @@ lval* builtin_list(lval* a) {
 }
 
 lval* builtin_eval(lval* a) {
+    LASSERTARGC("eval", 1, a->count);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Function 'eval' expected a Q expression");
-    LASSERT(a, a->count == 1,
-        "Function 'eval' takes exactly 1 argument.");
 
     lval* x = lval_take(a, 0);
     x->type = LVAL_SEXPR;
@@ -409,8 +415,7 @@ lval* builtin_join(lval* a) {
 }
 
 lval* builtin_cons(lval* a) {
-    LASSERT(a, a->count == 2,
-        "Function 'cons' takes exactly 2 arguments.");
+    LASSERTARGC("cons", 2, a->count);
     LASSERT(a, a->val.cell[1]->type == LVAL_QEXPR,
         "Second argument to 'cons' must be a Q expression.");
     lval* x = lval_pop(a, 0);
@@ -420,8 +425,7 @@ lval* builtin_cons(lval* a) {
 }
 
 lval* builtin_len(lval* a) {
-    LASSERT(a, a->count == 1,
-        "Function 'len' takes exactly 1 argument");
+    LASSERTARGC("len", 1, a->count);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Function 'len' only applies to Q expressions.");
     lval* x = lval_lng(a->val.cell[0]->count);
@@ -430,8 +434,7 @@ lval* builtin_len(lval* a) {
 }
 
 lval* builtin_init(lval* a) {
-    LASSERT(a, a->count == 1,
-        "Function 'init' takes exactly 1 argument");
+    LASSERTARGC("init", 1, a->count);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Function 'init' only applies to Q expressions.");
 
@@ -442,8 +445,7 @@ lval* builtin_init(lval* a) {
 }
 
 lval* builtin_last(lval* a) {
-    LASSERT(a, a->count == 1,
-        "Function 'last' takes exactly 1 argument");
+    LASSERTARGC("last", 1, a->count);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Function 'last' only applies to Q expressions.");
 
