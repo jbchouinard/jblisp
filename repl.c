@@ -21,6 +21,14 @@
         return lval_err(msg);                                                  \
     }
 
+// Parser
+mpc_parser_t* Number;
+mpc_parser_t* Symbol;
+mpc_parser_t* Sexpr;
+mpc_parser_t* Qexpr;
+mpc_parser_t* Expr;
+mpc_parser_t* JBLisp;
+
 // Lisp Value (lval) type
 struct lval {
     enum { LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR } type;
@@ -525,13 +533,49 @@ lval* lval_eval(lval* v) {
         return v;
 }
 
+void exec_file(char* filename) {
+    mpc_result_t res;
+
+    printf("Loading file '%s'...", filename);
+    if (mpc_parse_contents(filename, JBLisp, &res)) {
+        lval* prog = lval_read(res.output);
+        mpc_ast_delete(res.output);
+        while (prog->count) {
+            lval* x = lval_eval(lval_pop(prog, 0));
+            if (x->type == LVAL_ERR) {
+                lval_println(x);
+            }
+            lval_del(x);
+        }
+        lval_del(prog);
+    } else {
+        mpc_err_print(res.error);
+        mpc_err_delete(res.error);
+    }
+    puts("done.");
+}
+
+void exec_line(char* input) {
+    mpc_result_t res;
+
+    if (mpc_parse("<stdin>", input, JBLisp, &res)) {
+        lval* x = lval_eval(lval_read(res.output));
+        lval_println(x);
+        lval_del(x);
+        mpc_ast_delete(res.output);
+    } else {
+        mpc_err_print(res.error);
+        mpc_err_delete(res.error);
+    }
+}
+
 int main(int argc, char** argv) {
-    mpc_parser_t* Number    = mpc_new("number");
-    mpc_parser_t* Symbol    = mpc_new("symbol");
-    mpc_parser_t* Sexpr     = mpc_new("sexpr");
-    mpc_parser_t* Qexpr     = mpc_new("qexpr");
-    mpc_parser_t* Expr      = mpc_new("expr");
-    mpc_parser_t* JBLisp    = mpc_new("jblisp");
+    Number    = mpc_new("number");
+    Symbol    = mpc_new("symbol");
+    Sexpr     = mpc_new("sexpr");
+    Qexpr     = mpc_new("qexpr");
+    Expr      = mpc_new("expr");
+    JBLisp    = mpc_new("jblisp");
 
     mpca_lang(MPCA_LANG_DEFAULT,
         "                                                                     \
@@ -549,25 +593,20 @@ int main(int argc, char** argv) {
         Number, Symbol, Sexpr, Qexpr, Expr, JBLisp
     );
 
-    puts("jblisp version 0.2.2");
+    puts("jblisp version 0.2.3");
     puts("Press ^C to exit\n");
+
+    for (int i=1; i < argc; i++) {
+        exec_file(argv[i]);
+    }
 
     while (1) {
         char* input = readline("jblisp> ");
         add_history(input);
-
-        mpc_result_t res;
-        if (mpc_parse("<stdin>", input, JBLisp, &res)) {
-            lval* x = lval_eval(lval_read(res.output));
-            lval_println(x);
-            lval_del(x);
-            mpc_ast_delete(res.output);
-        } else {
-            mpc_err_print(res.error);
-            mpc_err_delete(res.error);
-        }
+        exec_line(input);
         free(input);
     }
+
     mpc_cleanup(6, Number, Symbol, Sexpr, Qexpr, Expr, JBLisp);
     return 0;
 }
