@@ -153,7 +153,10 @@ lval *lval_take(lval *v, int n) {
 
 lval *lval_read_num(mpc_ast_t *ast) {
     errno = 0;
-    if (strstr(ast->contents, ".")) {
+    if (strstr(ast->contents, ".") ||
+        strstr(ast->contents, "e") ||
+        strstr(ast->contents, "E"))
+    {
         double x = strtod(ast->contents, NULL);
         return errno != ERANGE ? lval_dbl(x) : lval_err("invalid number");
     } else {
@@ -581,7 +584,7 @@ int main(int argc, char **argv) {
 
     mpca_lang(MPCA_LANG_DEFAULT,
         "                                                                     \
-            number   : /-?[0-9]*[.][0-9]+/ | /-?[0-9]+[.]?/ ;                 \
+            number   : /((-?[0-9]*[.][0-9]+)|(-?[0-9]+[.]?))([eE]-?[0-9]+)?/ ;\
             symbol   : '+' | '-' | '/' | '*' | '^' | '%' |                    \
                        \"min\" | \"max\" | \"and\" | \"or\" |                 \
                        \"list\" |  \"join\" | \"eval\" | \"last\" |           \
