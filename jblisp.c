@@ -434,7 +434,8 @@ void lval_print(lval *v) {
             lval_print_expr(v, '{', '}');
             break;
         case LVAL_PROC:
-            printf("<procedure at %p>", (void*) &v);
+            printf("<procedure at %p>", (void*) v->val.proc);
+            break;
         case LVAL_ERR:
             printf("Error: %s", v->val.err);
             break;
@@ -567,6 +568,38 @@ lval *builtin_op(lval *a, char *op) {
     }
     lval_del(a);
     return x;
+}
+
+lval* builtin_add(lenv *e, lval *a) {
+    return builtin_op(a, "+");
+}
+
+lval* builtin_sub(lenv *e, lval *a) {
+    return builtin_op(a, "-");
+}
+
+lval* builtin_mul(lenv *e, lval *a) {
+    return builtin_op(a, "*");
+}
+
+lval* builtin_div(lenv *e, lval *a) {
+    return builtin_op(a, "/");
+}
+
+lval* builtin_mod(lenv *e, lval *a) {
+    return builtin_op(a, "%");
+}
+
+lval* builtin_exp(lenv *e, lval *a) {
+    return builtin_op(a, "^");
+}
+
+lval* builtin_min(lenv *e, lval *a) {
+    return builtin_op(a, "min");
+}
+
+lval* builtin_max(lenv *e, lval *a) {
+    return builtin_op(a, "max");
 }
 
 lval *builtin_nth(lenv *e, lval *a) {
@@ -743,21 +776,59 @@ lval *builtin_not(lenv* e, lval *a) {
     return b;
 }
 
-lval *lval_eval_sexpr(lenv *e, lval *v) {
-    for (int i=0; i < v->count; i++) {
-        v->val.cell[i] = lval_eval(v->val.cell[i]);
-    }
+void add_builtins(lenv *e) {
+    // List
+    lenv_put(e, "list", lval_proc(builtin_list));
+    lenv_put(e, "eval", lval_proc(builtin_eval));
+    lenv_put(e, "join", lval_proc(builtin_join));
+    lenv_put(e, "cons", lval_proc(builtin_cons));
+    lenv_put(e, "len", lval_proc(builtin_len));
+    lenv_put(e, "head", lval_proc(builtin_head));
+    lenv_put(e, "tail", lval_proc(builtin_tail));
+    lenv_put(e, "init", lval_proc(builtin_init));
+    lenv_put(e, "last", lval_proc(builtin_last));
+    lenv_put(e, "nth", lval_proc(builtin_nth));
 
-    if (v->count == 0)
+    // Math
+    lenv_put(e, "+", lval_proc(builtin_add));
+    lenv_put(e, "-", lval_proc(builtin_sub));
+    lenv_put(e, "*", lval_proc(builtin_mul));
+    lenv_put(e, "/", lval_proc(builtin_div));
+    lenv_put(e, "%", lval_proc(builtin_mod));
+    lenv_put(e, "^", lval_proc(builtin_exp));
+    lenv_put(e, "min", lval_proc(builtin_min));
+    lenv_put(e, "max", lval_proc(builtin_max));
+
+    // Logic
+    lenv_put(e, "equal?", lval_proc(builtin_equal));
+    lenv_put(e, "is?", lval_proc(builtin_is));
+    lenv_put(e, "and", lval_proc(builtin_and));
+    lenv_put(e, "or", lval_proc(builtin_or));
+    lenv_put(e, "not", lval_proc(builtin_not));
+}
+
+lval *lval_eval_sexpr(lenv *e, lval *v) {
+    if (v->count == 0) {
         return v;
+    }
+    for (int i=0; i < v->count; i++) {
+        v->val.cell[i] = lval_eval(e, v->val.cell[i]);
+    }
 
     lval *proc = lval_pop(v, 0);
-    if (proc->type != LVAL_PROC) {
-        lval_del(op);
-        lval_del(v);
-        return lval_err("Expected procedure at start of S expression.");
-    }
 
+    if (proc->type == LVAL_ERR) {
+        lval_del(v);
+        return proc;
+    }
+    if (proc->type != LVAL_PROC) {
+        char msg[100];
+        snprintf(msg, 100, "Object of type '%s' is not applicable.",
+                TYPE_NAMES[proc->type]);
+        lval_del(proc);
+        lval_del(v);
+        return lval_err(msg);
+    }
     lval *result = proc->val.proc(e, v);
     lval_del(proc);
     return result;
@@ -769,11 +840,13 @@ lval *lval_eval(lenv *e, lval *v) {
         case LVAL_SYM:
             x = lenv_get(e, v->val.sym);
             lval_del(v);
-            return x;
+            break;
         case LVAL_SEXPR:
-             x = lval_eval_sexpr(v);
+             x = lval_eval_sexpr(e, v);
+             break;
         default:
             x = v;
+            break;
     }
     return x;
 }
@@ -800,7 +873,7 @@ void exec_file(lenv *e, char *filename) {
     puts("done.");
 }
 
-void exec_line(lenv e*, char *input) {
+void exec_line(lenv *e, char *input) {
     mpc_result_t res;
 
     if (mpc_parse("<stdin>", input, JBLisp, &res)) {

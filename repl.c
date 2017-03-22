@@ -6,6 +6,7 @@
 
 int main(int argc, char **argv) {
     lenv *env = lenv_new();
+    add_builtins(env);
     build_parser();
     puts("jblisp version 0.2.3");
     puts("Press ^C to exit\n");

@@ -59,6 +59,12 @@ lval* builtin_tail(lenv*, lval*);
 lval* builtin_init(lenv*, lval*);
 lval* builtin_last(lenv*, lval*);
 lval* builtin_nth(lenv*, lval*);
+lval* builtin_add(lenv*, lval*);
+lval* builtin_sub(lenv*, lval*);
+lval* builtin_mul(lenv*, lval*);
+lval* builtin_div(lenv*, lval*);
+lval* builtin_mod(lenv*, lval*);
+lval* builtin_exp(lenv*, lval*);
 lval* builtin_min(lenv*, lval*);
 lval* builtin_max(lenv*, lval*);
 lval* builtin_equal(lenv*, lval*);
@@ -75,5 +81,6 @@ lval* lval_eval_sexpr(lenv*, lval*);
 void exec_line(lenv*, char*);
 void exec_file(lenv*, char*);
 void build_parser(void);
+void add_builtins(lenv*);
 
 #endif
