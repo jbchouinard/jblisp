@@ -81,69 +81,58 @@ void lenv_del(lenv *e) {
         free(e->syms[i]);
         lval_del(e->vals[i]);
     }
+    free(e->syms);
+    free(e->vals);
+    free(e);
 }
 
 void lenv_put(lenv *e, char *sym, lval *v) {
-    int i = 0;
-    int cmp = 1;
-
-    while(i < e->count && (cmp = strcmp(e->syms[i], sym)) != 0) {
-        i++;
-    }
-    if (cmp == 0) {
-        e->vals[i] = v;
-    } else {
-        e->count++;
-        if (e->size == 0) {
-            e->size = e->count * 2;
-            e->syms = malloc(sizeof(char*) * e->size);
-            e->vals = malloc(sizeof(lval*) * e->size);
+    for(int i=0; i < e->count; i++) {
+        if (strcmp(e->syms[i], sym) == 0) {
+            e->vals[i] = lval_copy(v);
+            return;
         }
-        else if (e->count > e->size) {
-            e->size*=2;
-            e->syms = realloc(e->syms, sizeof(char*) * e->size);
-            e->vals = realloc(e->vals, sizeof(lval*) * e->size);
-        }
-        e->syms[e->count-1] = malloc(strlen(sym) + 1);
-        strcpy(e->syms[e->count-1], sym);
-        e->vals[e->count-1] = lval_copy(v);
     }
+    // Symbol not found in env, append it
+    e->count++;
+    if (e->count > e->size) {
+        e->size = e->size ? e->size * 2 : e->count;
+        e->syms = realloc(e->syms, sizeof(char*) * e->size);
+        e->vals = realloc(e->vals, sizeof(lval*) * e->size);
+    }
+    e->syms[e->count-1] = malloc(strlen(sym) + 1);
+    strcpy(e->syms[e->count-1], sym);
+    e->vals[e->count-1] = lval_copy(v);
 }
 
 lval *lenv_get(lenv *e, char *sym) {
-    int i = 0;
-    int cmp = 1;
-
-    while(i < e->count && (cmp = strcmp(e->syms[i], sym)) != 0) {
-        i++;
+    for(int i=0; i < e->count; i++) {
+        if (strcmp(e->syms[i], sym) == 0) {
+            return lval_copy(e->vals[i]);
+        }
     }
-
-    if (cmp == 0) {
-        return e->vals[i];
-    } else {
-        return (lval*) NULL;
-    }
+    char msg[50];
+    snprintf(msg, 50, "Unbound symbol '%s'.", sym);
+    return lval_err(msg);
 }
 
 lval *lenv_pop(lenv *e, char *sym) {
-    int i = 0;
-    int cmp = 1;
-
-    while(i < e->count && (cmp = strcmp(e->syms[i], sym)) != 0) {
-        i++;
-    }
-    if (cmp == 0) {
-        e->count--;
-        lval* v = e->vals[i];
-        int to_move = e->count - i;
-        if (to_move) {
-            memmove(e->syms[i], e->syms[i+1], to_move * sizeof(char*));
-            memmove(e->vals[i], e->vals[i+1], to_move * sizeof(lval*));
+    for(int i=0; i < e->count; i++) {
+        if (strcmp(e->syms[i], sym) == 0) {
+            e->count--;
+            lval* v = lval_copy(e->vals[i]);
+            lval_del(e->vals[i]);
+            int to_move = e->count - i;
+            if (to_move) {
+                memmove(e->syms[i], e->syms[i+1], to_move * sizeof(char*));
+                memmove(e->vals[i], e->vals[i+1], to_move * sizeof(lval*));
+            }
+            return v;
         }
-        return v;
-    } else {
-        return (lval*) NULL;
     }
+    char msg[50];
+    snprintf(msg, 50, "Unbound symbol '%s'.", sym);
+    return lval_err(msg);
 }
 
 lval *lval_dbl(double x) {

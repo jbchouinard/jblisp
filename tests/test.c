@@ -37,8 +37,11 @@ static char *test_lenv() {
     mu_assert(lval_equal(v, w), "GET: Did not get back what we put in the env.");
     w = lenv_pop(e, "foo");
     mu_assert(lval_equal(v, w), "POP: Did not get back what we put in the env.");
+    lval_del(w);
     w = lenv_get(e, "foo");
-    mu_assert(w == NULL, "POP: Element was not removed from env.");
+    mu_assert(!lval_equal(v, w), "POP: Element was not removed from env.");
+    lval_del(v);
+    lval_del(w);
     lenv_del(e);
     return 0;
 }
