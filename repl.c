@@ -5,18 +5,19 @@
 #include "jblisp.h"
 
 int main(int argc, char **argv) {
+    lenv *env = lenv_new();
     build_parser();
     puts("jblisp version 0.2.3");
     puts("Press ^C to exit\n");
 
     for (int i=1; i < argc; i++) {
-        exec_file(argv[i]);
+        exec_file(env, argv[i]);
     }
 
     while (1) {
         char *input = readline("jblisp> ");
         add_history(input);
-        exec_line(input);
+        exec_line(env, input);
         free(input);
     }
 

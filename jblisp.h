@@ -21,6 +21,7 @@ lval *lenv_pop(lenv*, char*);
 void lenv_del(lenv*);
 void lenv_put(lenv*, char*, lval*);
 
+lval* lval_bool(int);
 lval* lval_dbl(double);
 lval* lval_lng(long);
 lval* lval_err(char*);
@@ -38,6 +39,7 @@ lval* lval_copy(lval*);
 void lval_del(lval*);
 int lval_equal(lval*, lval*);
 int lval_is(lval*, lval*);
+int lval_is_true(lval*);
 
 void lval_print(lval*);
 void lval_println(lval*);
@@ -46,30 +48,32 @@ void lval_print_expr(lval*, char, char);
 lval* builtin_op(lval*, char*);
 lval* builtin_op_dbl(lval*, lval*, char*);
 lval* builtin_op_lng(lval*, lval*, char*);
-lval* builtin_list(lval*);
-lval* builtin_eval(lval*);
-lval* builtin_join(lval*);
-lval* builtin_cons(lval*);
-lval* builtin_len(lval*);
-lval* builtin_car(lval*);
-lval* builtin_cdr(lval*);
-lval* builtin_nth(lval*);
-lval* builtin_min(lval*);
-lval* builtin_max(lval*);
-lval* builtin_equal(lval*);
-lval* builtin_is(lval*);
-lval* builtin_init(lval*);
-lval* builtin_last(lval*);
-lval* builtin_c__r(lval*, char*);
-lval* builtin(lval*, char*);
+
+lval* builtin_list(lenv*, lval*);
+lval* builtin_eval(lenv*, lval*);
+lval* builtin_join(lenv*, lval*);
+lval* builtin_cons(lenv*, lval*);
+lval* builtin_len(lenv*, lval*);
+lval* builtin_head(lenv*, lval*);
+lval* builtin_tail(lenv*, lval*);
+lval* builtin_init(lenv*, lval*);
+lval* builtin_last(lenv*, lval*);
+lval* builtin_nth(lenv*, lval*);
+lval* builtin_min(lenv*, lval*);
+lval* builtin_max(lenv*, lval*);
+lval* builtin_equal(lenv*, lval*);
+lval* builtin_is(lenv*, lval*);
+lval* builtin_and(lenv*, lval*);
+lval* builtin_or(lenv*, lval*);
+lval* builtin_not(lenv*, lval*);
 
 lval* lval_read(mpc_ast_t*);
 lval* lval_read_num(mpc_ast_t*);
-lval* lval_eval(lval*);
-lval* lval_eval_sexpr(lval*);
+lval* lval_eval(lenv*, lval*);
+lval* lval_eval_sexpr(lenv*, lval*);
 
-void exec_line(char*);
-void exec_file(char*);
+void exec_line(lenv*, char*);
+void exec_file(lenv*, char*);
 void build_parser(void);
 
 #endif

@@ -89,7 +89,7 @@ void lenv_del(lenv *e) {
 }
 
 void lenv_put(lenv *e, char *sym, lval *v) {
-    for(int i=0; i < e->count; i++) {
+    for (int i=0; i < e->count; i++) {
         if (strcmp(e->syms[i], sym) == 0) {
             e->vals[i] = lval_copy(v);
             return;
@@ -108,7 +108,7 @@ void lenv_put(lenv *e, char *sym, lval *v) {
 }
 
 lval *lenv_get(lenv *e, char *sym) {
-    for(int i=0; i < e->count; i++) {
+    for (int i=0; i < e->count; i++) {
         if (strcmp(e->syms[i], sym) == 0) {
             return lval_copy(e->vals[i]);
         }
@@ -119,7 +119,7 @@ lval *lenv_get(lenv *e, char *sym) {
 }
 
 lval *lenv_pop(lenv *e, char *sym) {
-    for(int i=0; i < e->count; i++) {
+    for (int i=0; i < e->count; i++) {
         if (strcmp(e->syms[i], sym) == 0) {
             e->count--;
             lval* v = lval_copy(e->vals[i]);
@@ -569,7 +569,7 @@ lval *builtin_op(lval *a, char *op) {
     return x;
 }
 
-lval *builtin_nth(lval *a) {
+lval *builtin_nth(lenv *e, lval *a) {
     LASSERT_ARGC("nth", a, 2)
     LASSERT_ARGT("nth", a, 0, LVAL_QEXPR);
     LASSERT_ARGT("nth", a, 1, LVAL_LNG);
@@ -590,23 +590,23 @@ lval *builtin_nth(lval *a) {
     return lval_take(v, n);
 }
 
-lval *builtin_car(lval *a) {
-    LASSERT_ARGC("car", a, 1);
-    LASSERT_ARGT("car", a, 0, LVAL_QEXPR);
+lval *builtin_head(lenv *e, lval *a) {
+    LASSERT_ARGC("head", a, 1);
+    LASSERT_ARGT("head", a, 0, LVAL_QEXPR);
     LASSERT(a, a->val.cell[0]->count != 0,
-        "Procedure 'car' undefined on empty list '{}'.");
+        "Procedure 'head' undefined on empty list '{}'.");
 
     // Delete all but first cell
     lval *v = lval_take(a, 0);
     return lval_take(v, 0);
 }
 
-lval *builtin_cdr(lval *a) {
-    LASSERT_ARGC("cdr", a, 1)
+lval *builtin_tail(lenv *e, lval *a) {
+    LASSERT_ARGC("tail", a, 1)
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Type Error - procedure 'cdr' expected a Q expression.");
+        "Type Error - procedure 'tail' expected a Q expression.");
     LASSERT(a, a->val.cell[0]->count != 0,
-        "Procedure 'cdr' undefined on empty list '{}'.");
+        "Procedure 'tail' undefined on empty list '{}'.");
 
     //Delete head
     lval *v = lval_take(a, 0);
@@ -614,24 +614,24 @@ lval *builtin_cdr(lval *a) {
     return v;
 }
 
-lval *builtin_list(lval *a) {
+lval *builtin_list(lenv *e, lval *a) {
     LASSERT(a, a->type == LVAL_SEXPR,
         "Procedure 'list' expected an S expression");
     a->type = LVAL_QEXPR;
     return a;
 }
 
-lval *builtin_eval(lval *a) {
+lval *builtin_eval(lenv *e, lval *a) {
     LASSERT_ARGC("eval", a, 1);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Procedure 'eval' expected a Q expression");
 
     lval *x = lval_take(a, 0);
     x->type = LVAL_SEXPR;
-    return lval_eval(x);
+    return lval_eval(e, x);
 }
 
-lval *builtin_join(lval *a) {
+lval *builtin_join(lenv *e, lval *a) {
     LASSERT(a, a->count != 0,
         "Procedure 'join' takes at least 1 argument.");
     for (int i=0; i < a->count; i++) {
@@ -650,7 +650,7 @@ lval *builtin_join(lval *a) {
     return x;
 }
 
-lval *builtin_cons(lval *a) {
+lval *builtin_cons(lenv *e, lval *a) {
     LASSERT_ARGC("cons", a, 2);
     LASSERT(a, a->val.cell[1]->type == LVAL_QEXPR,
         "Second argument to 'cons' must be a Q expression.");
@@ -660,7 +660,7 @@ lval *builtin_cons(lval *a) {
     return q;
 }
 
-lval *builtin_len(lval *a) {
+lval *builtin_len(lenv *e, lval *a) {
     LASSERT_ARGC("len", a, 1);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Procedure 'len' only applies to Q expressions.");
@@ -669,7 +669,7 @@ lval *builtin_len(lval *a) {
     return x;
 }
 
-lval *builtin_init(lval *a) {
+lval *builtin_init(lenv *e, lval *a) {
     LASSERT_ARGC("init", a, 1);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Procedure 'init' only applies to Q expressions.");
@@ -680,7 +680,7 @@ lval *builtin_init(lval *a) {
     return x;
 }
 
-lval *builtin_last(lval *a) {
+lval *builtin_last(lenv* e, lval *a) {
     LASSERT_ARGC("last", a, 1);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Procedure 'last' only applies to Q expressions.");
@@ -689,30 +689,7 @@ lval *builtin_last(lval *a) {
     return lval_take(x, x->count-1);
 }
 
-// cadr, cdar, caar, etc.
-lval *builtin_c__r(lval *a, char *func) {
-    char err_msg[100];
-    snprintf(err_msg, 100, "Unknown builtin procedure '%s'.", func);
-    int len = strlen(func);
-    LASSERT(a, len > 2, err_msg);
-    LASSERT(a, func[0] == 'c' && func[len-1] == 'r', err_msg);
-
-    for (int i = len-2; i > 0; i--) {
-        if (func[i] == 'a')
-            a = builtin_car(a);
-        else if (func[i] == 'd')
-            a = builtin_cdr(a);
-        else {
-            lval_del(a);
-            return lval_err(err_msg);
-        }
-        lval *x = lval_sexpr();
-        a = lval_add(x, a);
-    }
-    return lval_take(a, 0);
-}
-
-lval *builtin_equal(lval *a) {
+lval *builtin_equal(lenv* e, lval *a) {
     LASSERT_ARGC("equal?", a, 2);
 
     int eq = lval_equal(a->val.cell[0], a->val.cell[1]);
@@ -720,7 +697,7 @@ lval *builtin_equal(lval *a) {
     return lval_lng((long) eq);
 }
 
-lval *builtin_is(lval *a) {
+lval *builtin_is(lenv* e, lval *a) {
     LASSERT_ARGC("equal?", a, 2);
 
     lval *v = a->val.cell[1];
@@ -728,15 +705,37 @@ lval *builtin_is(lval *a) {
     return lval_lng(lval_is(v, w));
 }
 
-lval *builtin_and(lval *a) {
-    return NULL;
+lval *builtin_and(lenv* e, lval *a) {
+    int i;
+    for (i=0; i < a->count; i++) {
+        if (!lval_is_true(a->val.cell[i])) {
+            return lval_take(a, i);
+        }
+    }
+    if (a->count == 0) {
+        lval_del(a);
+        return lval_bool(LTRUE);
+    } else {
+        return lval_take(a, --i);
+    }
 }
 
-lval *builtin_or(lval *a) {
-    return NULL;
+lval *builtin_or(lenv* e, lval *a) {
+    int i;
+    for (i=0; i < a->count; i++) {
+        if (lval_is_true(a->val.cell[i])) {
+            return lval_take(a, i);
+        }
+    }
+    if (a->count == 0) {
+        lval_del(a);
+        return lval_bool(LFALSE);
+    } else {
+        return lval_take(a, --i);
+    }
 }
 
-lval *builtin_not(lval *a) {
+lval *builtin_not(lenv* e, lval *a) {
     LASSERT_ARGC("not", a, 1);
     lval* v = lval_take(a, 0);
     lval* b = lval_bool(lval_is_true(v) ? LFALSE : LTRUE);
@@ -744,55 +743,42 @@ lval *builtin_not(lval *a) {
     return b;
 }
 
-lval *builtin(lval *a, char *func) {
-    if (strcmp("list", func) == 0) return builtin_list(a);
-    if (strcmp("join", func) == 0) return builtin_join(a);
-    if (strcmp("eval", func) == 0) return builtin_eval(a);
-    if (strcmp("cons", func) == 0) return builtin_cons(a);
-    if (strcmp("car", func) == 0) return builtin_car(a);
-    if (strcmp("cdr", func) == 0) return builtin_cdr(a);
-    if (strcmp("nth", func) == 0) return builtin_nth(a);
-    if (strcmp("len", func) == 0) return builtin_len(a);
-    if (strcmp("init", func) == 0) return builtin_init(a);
-    if (strcmp("last", func) == 0) return builtin_last(a);
-    if (strcmp("is?", func) == 0) return builtin_is(a);
-    if (strcmp("equal?", func) == 0) return builtin_equal(a);
-    if (strcmp("and", func) == 0) return builtin_and(a);
-    if (strcmp("or", func) == 0) return builtin_or(a);
-    if (strcmp("not", func) == 0) return builtin_not(a);
-    if (strcmp("min", func) == 0) return builtin_op(a, func);
-    if (strcmp("max", func) == 0) return builtin_op(a, func);
-    if (strstr("^+-/*%", func)) return builtin_op(a, func);
-    return builtin_c__r(a, func);
-}
-
-lval *lval_eval_sexpr(lval *v) {
-    for (int i=0; i < v->count; i++)
+lval *lval_eval_sexpr(lenv *e, lval *v) {
+    for (int i=0; i < v->count; i++) {
         v->val.cell[i] = lval_eval(v->val.cell[i]);
+    }
 
     if (v->count == 0)
         return v;
 
-    lval *op = lval_pop(v, 0);
-    if (op->type != LVAL_SYM) {
+    lval *proc = lval_pop(v, 0);
+    if (proc->type != LVAL_PROC) {
         lval_del(op);
         lval_del(v);
         return lval_err("Expected procedure at start of S expression.");
     }
 
-    lval *result = builtin(v, op->val.sym);
-    lval_del(op);
+    lval *result = proc->val.proc(e, v);
+    lval_del(proc);
     return result;
 }
 
-lval *lval_eval(lval *v) {
-    if (v->type == LVAL_SEXPR)
-        return lval_eval_sexpr(v);
-    else
-        return v;
+lval *lval_eval(lenv *e, lval *v) {
+    lval *x;
+    switch (v->type) {
+        case LVAL_SYM:
+            x = lenv_get(e, v->val.sym);
+            lval_del(v);
+            return x;
+        case LVAL_SEXPR:
+             x = lval_eval_sexpr(v);
+        default:
+            x = v;
+    }
+    return x;
 }
 
-void exec_file(char *filename) {
+void exec_file(lenv *e, char *filename) {
     mpc_result_t res;
 
     printf("Loading file '%s'...", filename);
@@ -800,7 +786,7 @@ void exec_file(char *filename) {
         lval *prog = lval_read(res.output);
         mpc_ast_delete(res.output);
         while (prog->count) {
-            lval *x = lval_eval(lval_pop(prog, 0));
+            lval *x = lval_eval(e, lval_pop(prog, 0));
             if (x->type == LVAL_ERR) {
                 lval_println(x);
             }
@@ -814,14 +800,14 @@ void exec_file(char *filename) {
     puts("done.");
 }
 
-void exec_line(char *input) {
+void exec_line(lenv e*, char *input) {
     mpc_result_t res;
 
     if (mpc_parse("<stdin>", input, JBLisp, &res)) {
         lval *line = lval_read(res.output);
         mpc_ast_delete(res.output);
         while (line->count) {
-            lval *x = lval_eval(lval_pop(line, 0));
+            lval *x = lval_eval(e, lval_pop(line, 0));
             lval_println(x);
             lval_del(x);
         }
