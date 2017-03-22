@@ -470,7 +470,7 @@ lval *lval_to_dbl(lval *v) {
     return v;
 }
 
-lval *builtin_op_dbl(lval *x, lval *y, char *op) {
+lval *builtin_arith_dbl(lval *x, lval *y, char *op) {
     if (strcmp(op, "+") == 0) x->val.dbl += y->val.dbl;
     else if (strcmp(op, "-") == 0) x->val.dbl -= y->val.dbl;
     else if (strcmp(op, "*") == 0) x->val.dbl *= y->val.dbl;
@@ -490,7 +490,7 @@ lval *builtin_op_dbl(lval *x, lval *y, char *op) {
     return x;
 }
 
-lval *builtin_op_lng(lval *x, lval *y, char *op) {
+lval *builtin_arith_lng(lval *x, lval *y, char *op) {
     if (strcmp(op, "+") == 0) x->val.lng += y->val.lng;
     else if (strcmp(op, "-") == 0) x->val.lng -= y->val.lng;
     else if (strcmp(op, "*") == 0) x->val.lng *= y->val.lng;
@@ -511,8 +511,24 @@ lval *builtin_op_lng(lval *x, lval *y, char *op) {
     return x;
 }
 
-lval *builtin_op(lval *a, char *op) {
+lval *builtin_arith(lval *a, char *op) {
     if (a->type == LVAL_ERR) return a;
+
+    if (a->count == 0) {
+        if (strcmp(op, "+") == 0) {
+            lval_del(a);
+            return lval_lng(0);
+        } else if (strcmp(op, "*") == 0) {
+            lval_del(a);
+            return lval_lng(1);
+        } else {
+            char msg[100];
+            snprintf(
+                msg, 100, "Builtin op '%s' takes at least 1 argument.", op);
+            lval_del(a);
+            return lval_err(msg);
+        }
+    }
 
     // If any operand is a double, cast all to double
     int type = LVAL_LNG;
@@ -520,8 +536,12 @@ lval *builtin_op(lval *a, char *op) {
         if (a->val.cell[i]->type == LVAL_DBL)
             type = LVAL_DBL;
         else if (a->val.cell[i]->type != LVAL_LNG) {
+            char msg[100];
+            snprintf(msg, 100,
+                    "Builtin op '%s' not applicable on type '%s'.",
+                    op, TYPE_NAMES[a->val.cell[i]->type]);
             lval_del(a);
-            return lval_err("cannot operate on non-number.");
+            return lval_err(msg);
         }
     }
     if (type == LVAL_DBL) {
@@ -541,27 +561,36 @@ lval *builtin_op(lval *a, char *op) {
 
     // (- x) = -x
     if ((strcmp(op, "-") == 0) && a->count == 0) {
-        switch (type) {
-            case LVAL_DBL:
-                x = builtin_op_dbl(lval_dbl(0.0), x, op);
-                break;
-            case LVAL_LNG:
-                x = builtin_op_lng(lval_lng(0.0), x , op);
-                break;
+        if (type == LVAL_DBL) {
+            lval_del(a);
+            return builtin_arith_dbl(lval_dbl(0.0), x, op);
+        } else {
+            lval_del(a);
+            return builtin_arith_lng(lval_lng(0), x , op);
+        }
+    }
+    // (/ x) = 1 / x
+    if ((strcmp(op, "/") == 0) && a->count == 0) {
+        if (type == LVAL_DBL) {
+            lval_del(a);
+            return builtin_arith_dbl(lval_dbl(1.0), x, op);
+        } else {
+            lval_del(a);
+            return builtin_arith_lng(lval_lng(1), x , op);
         }
     }
 
-    while (a->count > 0) {
+    while (a->count) {
         lval *y;
         if (assoc == ASSOC_LEFT) y = lval_pop(a, 0);
         else                     y = lval_pop(a, a->count-1);
 
         switch (type) {
             case LVAL_DBL:
-                x = builtin_op_dbl(x, y, op);
+                x = builtin_arith_dbl(x, y, op);
                 break;
             case LVAL_LNG:
-                x = builtin_op_lng(x, y, op);
+                x = builtin_arith_lng(x, y, op);
                 break;
         }
         if (x->type == LVAL_ERR) break;
@@ -571,35 +600,35 @@ lval *builtin_op(lval *a, char *op) {
 }
 
 lval* builtin_add(lenv *e, lval *a) {
-    return builtin_op(a, "+");
+    return builtin_arith(a, "+");
 }
 
 lval* builtin_sub(lenv *e, lval *a) {
-    return builtin_op(a, "-");
+    return builtin_arith(a, "-");
 }
 
 lval* builtin_mul(lenv *e, lval *a) {
-    return builtin_op(a, "*");
+    return builtin_arith(a, "*");
 }
 
 lval* builtin_div(lenv *e, lval *a) {
-    return builtin_op(a, "/");
+    return builtin_arith(a, "/");
 }
 
 lval* builtin_mod(lenv *e, lval *a) {
-    return builtin_op(a, "%");
+    return builtin_arith(a, "%");
 }
 
 lval* builtin_exp(lenv *e, lval *a) {
-    return builtin_op(a, "^");
+    return builtin_arith(a, "^");
 }
 
 lval* builtin_min(lenv *e, lval *a) {
-    return builtin_op(a, "min");
+    return builtin_arith(a, "min");
 }
 
 lval* builtin_max(lenv *e, lval *a) {
-    return builtin_op(a, "max");
+    return builtin_arith(a, "max");
 }
 
 lval *builtin_nth(lenv *e, lval *a) {
@@ -904,7 +933,7 @@ void build_parser() {
         "                                                                     \
             boolean  : /(#t)|(#f)/ ;                                     \
             number   : /((-?[0-9]*[.][0-9]+)|(-?[0-9]+[.]?))([eE]-?[0-9]+)?/ ;\
-            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&?]+/ ;                    \
+            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&?\\^]+/ ;                 \
             sexpr    : '(' <expr>* ')' ;                                      \
             qexpr    : '{' <expr>* '}' ;                                      \
             expr     : <boolean > | <number> | <symbol> | <sexpr> | <qexpr> ; \

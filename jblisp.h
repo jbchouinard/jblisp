@@ -45,9 +45,9 @@ void lval_print(lval*);
 void lval_println(lval*);
 void lval_print_expr(lval*, char, char);
 
-lval* builtin_op(lval*, char*);
-lval* builtin_op_dbl(lval*, lval*, char*);
-lval* builtin_op_lng(lval*, lval*, char*);
+lval* builtin_arith(lval*, char*);
+lval* builtin_arith_dbl(lval*, lval*, char*);
+lval* builtin_arith_lng(lval*, lval*, char*);
 
 lval* builtin_list(lenv*, lval*);
 lval* builtin_eval(lenv*, lval*);
