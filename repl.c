@@ -66,6 +66,7 @@ struct lval {
 
 struct lenv {
     int count;
+    int size;
     char **syms;
     lval **vals;
 };
@@ -76,6 +77,7 @@ enum { ASSOC_RIGHT, ASSOC_LEFT };
 lenv *lenv_new(void) {
     lenv *e = malloc(sizeof(lenv));
     e->count = 0;
+    e->size = 0;
     e->syms = NULL;
     e->vals = NULL;
     return e;
@@ -86,6 +88,40 @@ void lenv_del(lenv *e) {
         free(e->syms[i]);
         lval_del(e->vals[i]);
     }
+}
+
+void lenv_put(lenv *e, char *sym, lval *v) {
+    int i = 0;
+    int cmp;
+
+    while((cmp = strcmp(e->syms[i], sym)) != 0 && i < e->count) {
+        i++;
+    }
+    if (cmp == 0) {
+        e->vals[i] = v;
+    } else {
+        e->count++;
+        if (e->size == 0) {
+            e->size = e->count * 2;
+            e->syms = malloc(sizeof(char*) * e->size);
+            e->vals = malloc(sizeof(lval*) * e->size);
+        }
+        else if (e->count > e->size) {
+            e->size*=2;
+            e->syms = realloc(e->syms, sizeof(char*) * e->size);
+            e->vals = realloc(e->vals, sizeof(lval*) * e->size);
+        }
+        e->syms[e->count-1] = sym;
+        e->vals[e->count-1] = v;
+    }
+}
+
+lval *lenv_get(lenv *e, char *sym) {
+    return (lval*) NULL;
+}
+
+lval *lenv_take(lenv *e, char *sym) {
+    return NULL;
 }
 
 lval *lval_dbl(double x) {
