@@ -17,7 +17,7 @@
     if (args->count != argc) {                                                 \
         char msg[100];                                                         \
         snprintf(msg, (size_t) 100,                                            \
-                 "Function '%s' expected %i argument(s), got %i.",             \
+                 "Procedure '%s' expected %i argument(s), got %i.",            \
                  fname, argc, args->count);                                    \
         lval_del(args);                                                        \
         return lval_err(msg);                                                  \
@@ -27,7 +27,7 @@
     if (args->val.cell[idx]->type != exp_type) {                               \
         char msg[100];                                                         \
         snprintf(msg, (size_t) 100,                                            \
-                 "Function '%s' expected argument %i of type '%s', got '%s'.", \
+                 "Procedure '%s' expected argument %i of type '%s', got '%s'.",\
                  fname, idx, TYPE_NAMES[exp_type],                             \
                  TYPE_NAMES[args->val.cell[idx]->type]);                       \
         lval_del(args);                                                        \
@@ -42,12 +42,16 @@ mpc_parser_t *Qexpr;
 mpc_parser_t *Expr;
 mpc_parser_t *JBLisp;
 
-// Lisp Value (lval) type
+// Lisp types
+enum { LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM,
+       LVAL_PROC, LVAL_SEXPR, LVAL_QEXPR };
 char* TYPE_NAMES[] = {
-    "integer", "decimal", "error", "symbol", "s-expression", "q-expression"
+    "integer", "decimal", "error", "symbol",
+    "procedure", "s-expression", "q-expression"
 };
+
 struct lval {
-    enum { LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR } type;
+    int type;
     int count;
     int size;
     union {
@@ -242,7 +246,7 @@ void lval_print(lval *v) {
             printf("Error: %s", v->val.err);
             break;
         default:
-            printf("Error: Lval has invalid type.");
+            printf("Error: LVAL has invalid type.");
             break;
     }
 }
@@ -262,7 +266,7 @@ lval *lval_to_dbl(lval *v) {
             break;
         default:
             lval_del(v);
-            v = lval_err("type error");
+            v = lval_err("type error: cannot be converted to number");
             break;
     }
     return v;
@@ -405,7 +409,7 @@ lval *builtin_car(lval *a) {
     LASSERT_ARGC("car", a, 1);
     LASSERT_ARGT("car", a, 0, LVAL_QEXPR);
     LASSERT(a, a->val.cell[0]->count != 0,
-        "Function 'car' undefined on empty list '{}'.");
+        "Procedure 'car' undefined on empty list '{}'.");
 
     // Delete all but first cell
     lval *v = lval_take(a, 0);
@@ -415,9 +419,9 @@ lval *builtin_car(lval *a) {
 lval *builtin_cdr(lval *a) {
     LASSERT_ARGC("cdr", a, 1)
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Type Error - function 'cdr' expected a Q expression.");
+        "Type Error - procedure 'cdr' expected a Q expression.");
     LASSERT(a, a->val.cell[0]->count != 0,
-        "Function 'cdr' undefined on empty list '{}'.");
+        "Procedure 'cdr' undefined on empty list '{}'.");
 
     //Delete head
     lval *v = lval_take(a, 0);
@@ -427,7 +431,7 @@ lval *builtin_cdr(lval *a) {
 
 lval *builtin_list(lval *a) {
     LASSERT(a, a->type == LVAL_SEXPR,
-        "Function 'list' expected an S expression");
+        "Procedure 'list' expected an S expression");
     a->type = LVAL_QEXPR;
     return a;
 }
@@ -435,7 +439,7 @@ lval *builtin_list(lval *a) {
 lval *builtin_eval(lval *a) {
     LASSERT_ARGC("eval", a, 1);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Function 'eval' expected a Q expression");
+        "Procedure 'eval' expected a Q expression");
 
     lval *x = lval_take(a, 0);
     x->type = LVAL_SEXPR;
@@ -444,10 +448,10 @@ lval *builtin_eval(lval *a) {
 
 lval *builtin_join(lval *a) {
     LASSERT(a, a->count != 0,
-        "Function 'join' takes at least 1 argument.");
+        "Procedure 'join' takes at least 1 argument.");
     for (int i=0; i < a->count; i++) {
         LASSERT(a, a->val.cell[i]->type == LVAL_QEXPR,
-            "Function 'join' takes only Q expression arguments.");
+            "Procedure 'join' takes only Q expression arguments.");
     }
 
     lval *x = lval_pop(a, 0);
@@ -474,7 +478,7 @@ lval *builtin_cons(lval *a) {
 lval *builtin_len(lval *a) {
     LASSERT_ARGC("len", a, 1);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Function 'len' only applies to Q expressions.");
+        "Procedure 'len' only applies to Q expressions.");
     lval *x = lval_lng(a->val.cell[0]->count);
     lval_del(a);
     return x;
@@ -483,7 +487,7 @@ lval *builtin_len(lval *a) {
 lval *builtin_init(lval *a) {
     LASSERT_ARGC("init", a, 1);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Function 'init' only applies to Q expressions.");
+        "Procedure 'init' only applies to Q expressions.");
 
     // Keep all but first cell
     lval *x = lval_take(a, 0);
@@ -494,7 +498,7 @@ lval *builtin_init(lval *a) {
 lval *builtin_last(lval *a) {
     LASSERT_ARGC("last", a, 1);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Function 'last' only applies to Q expressions.");
+        "Procedure 'last' only applies to Q expressions.");
 
     lval *x = lval_take(a, 0);
     return lval_take(x, x->count-1);
