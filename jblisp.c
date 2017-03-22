@@ -4,6 +4,7 @@
 #include "mpc.h"
 #include "jblisp.h"
 
+mpc_parser_t *Boolean;
 mpc_parser_t *Number;
 mpc_parser_t *Symbol;
 mpc_parser_t *Sexpr;
@@ -36,10 +37,10 @@ mpc_parser_t *JBLisp;
     }
 
 // Lisp types
-enum { LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM,
+enum { LVAL_BOOL, LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM,
        LVAL_PROC, LVAL_SEXPR, LVAL_QEXPR };
 char* TYPE_NAMES[] = {
-    "integer", "decimal", "error", "symbol",
+    "boolean", "integer", "decimal", "error", "symbol",
     "procedure", "s-expression", "q-expression"
 };
 
@@ -48,6 +49,7 @@ struct _lval {
     int count;
     int size;
     union {
+        enum {LFALSE=0, LTRUE=!LFALSE} bool;
         double dbl;
         long lng;
         char *err;
@@ -135,6 +137,13 @@ lval *lenv_pop(lenv *e, char *sym) {
     return lval_err(msg);
 }
 
+lval *lval_bool(int b) {
+    lval *v = malloc(sizeof(lval));
+    v->type = LVAL_BOOL;
+    v->val.bool = b ? LTRUE : LFALSE;
+    return v;
+}
+
 lval *lval_dbl(double x) {
     lval *v = malloc(sizeof(lval));
     v->type = LVAL_DBL;
@@ -204,6 +213,9 @@ int lval_equal(lval *v, lval *w) {
         return eq;
     }
     switch(v->type) {
+        case LVAL_BOOL:
+            eq = v->val.bool == w->val.bool;
+            break;
         case LVAL_DBL:
             eq = v->val.dbl == w->val.dbl;
             break;
@@ -235,19 +247,31 @@ int lval_equal(lval *v, lval *w) {
     return eq;
 }
 
+int lval_is_true(lval *v) {
+    int t;
+    switch(v->type) {
+        case LVAL_BOOL:
+            t = v->val.bool;
+            break;
+        default:
+            t = LTRUE;
+            break;
+    }
+    return t;
+}
+
 void lval_del(lval *v) {
     switch(v->type) {
+        case LVAL_BOOL:
         case LVAL_DBL:
-            break;
         case LVAL_LNG:
+        case LVAL_PROC:
             break;
         case LVAL_ERR:
             free(v->val.err);
             break;
         case LVAL_SYM:
             free(v->val.sym);
-            break;
-        case LVAL_PROC:
             break;
         case LVAL_SEXPR:
         case LVAL_QEXPR:
@@ -264,6 +288,9 @@ lval *lval_copy(lval *v) {
     x->type = v->type;
 
     switch (v->type) {
+        case LVAL_BOOL:
+            x->val.bool = v->val.bool;
+            break;
         case LVAL_DBL:
             x->val.dbl = v->val.dbl;
             break;
@@ -347,6 +374,10 @@ lval *lval_read(mpc_ast_t *ast) {
         return lval_read_num(ast);
     if (strstr(ast->tag, "symbol"))
         return lval_sym(ast->contents);
+    if (strstr(ast->tag, "boolean")) {
+        return lval_bool(
+            (strcmp(ast->contents, "#t") == 0) ? LTRUE : LFALSE);
+    }
 
     lval *x = NULL;
     if (strcmp(ast->tag, ">") == 0 || strstr(ast->tag, "sexpr"))
@@ -384,6 +415,9 @@ void lval_print_expr(lval *v, char open, char close) {
 
 void lval_print(lval *v) {
     switch (v->type) {
+        case LVAL_BOOL:
+            printf(v->val.bool ? "#t" : "#f");
+            break;
         case LVAL_LNG:
             printf("%li", v->val.lng);
             break;
@@ -417,6 +451,10 @@ void lval_println(lval *v) {
 
 lval *lval_to_dbl(lval *v) {
     switch (v->type) {
+        case LVAL_BOOL:
+            v->type = LVAL_DBL;
+            v->val.dbl = v->val.bool ? 1.0 : 0.0;
+            break;
         case LVAL_DBL:
             break;
         case LVAL_LNG:
@@ -443,15 +481,9 @@ lval *builtin_op_dbl(lval *x, lval *y, char *op) {
     else if (strcmp(op, "max") == 0) {
         if (x->val.dbl < y->val.dbl) x->val.dbl = y->val.dbl;
     }
-    else if (strcmp(op, "and") == 0) {
-        if (x->val.dbl != 0) x->val.dbl = y->val.dbl;
-    }
-    else if (strcmp(op, "or") == 0) {
-        if (x->val.dbl == 0) x->val.dbl = y->val.dbl;
-    }
     else {
         lval_del(x);
-        x = lval_err("bad operator for type DOUBLE");
+        x = lval_err("bad operator for type LVAL_DBL");
     }
     lval_del(y);
     return x;
@@ -469,16 +501,10 @@ lval *builtin_op_lng(lval *x, lval *y, char *op) {
     else if (strcmp(op, "max") == 0) {
         if (x->val.lng < y->val.lng) x->val.lng = y->val.lng;
     }
-    else if (strcmp(op, "and") == 0) {
-        if (x->val.lng != 0) x->val.lng = y->val.lng;
-    }
-    else if (strcmp(op, "or") == 0) {
-        if (x->val.lng == 0) x->val.lng = y->val.lng;
-    }
     else if (strcmp(op, "%") == 0) x->val.lng %= y->val.lng;
     else {
         lval_del(x);
-        y = lval_err("bad operator for type LONG");
+        y = lval_err("bad operator for type LVAL_LNG");
     }
     lval_del(y);
     return x;
@@ -702,6 +728,22 @@ lval *builtin_is(lval *a) {
     return lval_lng(lval_is(v, w));
 }
 
+lval *builtin_and(lval *a) {
+    return NULL;
+}
+
+lval *builtin_or(lval *a) {
+    return NULL;
+}
+
+lval *builtin_not(lval *a) {
+    LASSERT_ARGC("not", a, 1);
+    lval* v = lval_take(a, 0);
+    lval* b = lval_bool(lval_is_true(v) ? LFALSE : LTRUE);
+    lval_del(v);
+    return b;
+}
+
 lval *builtin(lval *a, char *func) {
     if (strcmp("list", func) == 0) return builtin_list(a);
     if (strcmp("join", func) == 0) return builtin_join(a);
@@ -715,9 +757,9 @@ lval *builtin(lval *a, char *func) {
     if (strcmp("last", func) == 0) return builtin_last(a);
     if (strcmp("is?", func) == 0) return builtin_is(a);
     if (strcmp("equal?", func) == 0) return builtin_equal(a);
-    if (strcmp("and", func) == 0) return builtin_op(a, func);
-    if (strcmp("or", func) == 0) return builtin_op(a, func);
-    if (strcmp("not", func) == 0) return builtin_op(a, func);
+    if (strcmp("and", func) == 0) return builtin_and(a);
+    if (strcmp("or", func) == 0) return builtin_or(a);
+    if (strcmp("not", func) == 0) return builtin_not(a);
     if (strcmp("min", func) == 0) return builtin_op(a, func);
     if (strcmp("max", func) == 0) return builtin_op(a, func);
     if (strstr("^+-/*%", func)) return builtin_op(a, func);
@@ -791,6 +833,7 @@ void exec_line(char *input) {
 }
 
 void build_parser() {
+    Boolean   = mpc_new("boolean");
     Number    = mpc_new("number");
     Symbol    = mpc_new("symbol");
     Sexpr     = mpc_new("sexpr");
@@ -800,14 +843,15 @@ void build_parser() {
 
     mpca_lang(MPCA_LANG_DEFAULT,
         "                                                                     \
+            boolean  : /(#t)|(#f)/ ;                                     \
             number   : /((-?[0-9]*[.][0-9]+)|(-?[0-9]+[.]?))([eE]-?[0-9]+)?/ ;\
             symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&?]+/ ;                    \
             sexpr    : '(' <expr>* ')' ;                                      \
             qexpr    : '{' <expr>* '}' ;                                      \
-            expr     : <number> | <symbol> | <sexpr> | <qexpr> ;              \
+            expr     : <boolean > | <number> | <symbol> | <sexpr> | <qexpr> ; \
             jblisp   : /^/ <expr>* /$/ ;                                      \
         ",
-        Number, Symbol, Sexpr, Qexpr, Expr, JBLisp
+        Boolean, Number, Symbol, Sexpr, Qexpr, Expr, JBLisp
     );
 }
 
