@@ -380,21 +380,30 @@ lval *builtin_op(lval *a, char *op) {
     return x;
 }
 
-lval *builtin_car(lval *a) {
-    LASSERT_ARGC("car", a, 1);
-    LASSERT_ARGT("car", a, 0, LVAL_QEXPR);
+lval *builtin_nth(lval *a) {
+    LASSERT_ARGC("nth", a, 2)
+    LASSERT_ARGT("nth", a, 0, LVAL_QEXPR);
+    LASSERT_ARGT("nth", a, 1, LVAL_LNG);
     LASSERT(a, a->val.cell[0]->count != 0,
-        "Function 'car' undefined on empty list '{}'.");
+        "Procedure 'nth' undefined on empty list '{}'.");
+
+    int n = (int) a->val.cell[1]->val.lng;
+    if (n < 0)
+        n = a->val.cell[0]->count + n;
+
+    LASSERT(a, n >= 0 ,
+        "Array bounds error at procedure 'nth'.");
+    LASSERT(a, n < a->val.cell[0]->count,
+        "Array bounds error at procedure 'nth'.");
 
     // Delete all but first cell
     lval *v = lval_take(a, 0);
-    return lval_take(v, 0);
+    return lval_take(v, n);
 }
 
-lval *builtin_nth(lval *a) {
-    LASSERT_ARGC("nth", a, 2)
+lval *builtin_car(lval *a) {
+    LASSERT_ARGC("car", a, 1);
     LASSERT_ARGT("car", a, 0, LVAL_QEXPR);
-    LASSERT_ARGT("car", a, 1, LVAL_LNG);
     LASSERT(a, a->val.cell[0]->count != 0,
         "Function 'car' undefined on empty list '{}'.");
 
@@ -493,11 +502,11 @@ lval *builtin_last(lval *a) {
 
 // cadr, cdar, caar, etc.
 lval *builtin_c__r(lval *a, char *func) {
+    char err_msg[100];
+    snprintf(err_msg, 100, "Unknown builtin procedure '%s'.", func);
     int len = strlen(func);
-    LASSERT(a, len > 2,
-        "Unknown builtin function");
-    LASSERT(a, func[0] == 'c' && func[len-1] == 'r',
-        "Unknown builtin function");
+    LASSERT(a, len > 2, err_msg);
+    LASSERT(a, func[0] == 'c' && func[len-1] == 'r', err_msg);
 
     for (int i = len-2; i > 0; i--) {
         if (func[i] == 'a')
@@ -506,7 +515,7 @@ lval *builtin_c__r(lval *a, char *func) {
             a = builtin_cdr(a);
         else {
             lval_del(a);
-            return lval_err("Unknown builtin funcion");
+            return lval_err(err_msg);
         }
         lval *x = lval_sexpr();
         a = lval_add(x, a);
@@ -521,8 +530,7 @@ lval *builtin(lval *a, char *func) {
     if (strcmp("cons", func) == 0) return builtin_cons(a);
     if (strcmp("car", func) == 0) return builtin_car(a);
     if (strcmp("cdr", func) == 0) return builtin_cdr(a);
-    if (strcmp("head", func) == 0) return builtin_car(a);
-    if (strcmp("tail", func) == 0) return builtin_cdr(a);
+    if (strcmp("nth", func) == 0) return builtin_nth(a);
     if (strcmp("len", func) == 0) return builtin_len(a);
     if (strcmp("init", func) == 0) return builtin_init(a);
     if (strcmp("last", func) == 0) return builtin_last(a);
@@ -546,7 +554,7 @@ lval *lval_eval_sexpr(lval *v) {
     if (op->type != LVAL_SYM) {
         lval_del(op);
         lval_del(v);
-        return lval_err("Expected function at start of S expression.");
+        return lval_err("Expected procedure at start of S expression.");
     }
 
     lval *result = builtin(v, op->val.sym);
@@ -612,15 +620,11 @@ int main(int argc, char **argv) {
     mpca_lang(MPCA_LANG_DEFAULT,
         "                                                                     \
             number   : /((-?[0-9]*[.][0-9]+)|(-?[0-9]+[.]?))([eE]-?[0-9]+)?/ ;\
-            symbol   : '+' | '-' | '/' | '*' | '^' | '%' |                    \
-                       \"min\" | \"max\" | \"and\" | \"or\" |                 \
-                       \"list\" |  \"join\" | \"eval\" | \"last\" |           \
-                       \"cons\" | \"len\" | \"init\" | \"head\" | \"tail\" |  \
-                       /c[ad]+r/ ;                                            \
-            sexpr    : '(' <expr> *')' ;                                      \
-            qexpr    : '{' <expr> *'}' ;                                      \
+            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;                     \
+            sexpr    : '(' <expr>* ')' ;                                      \
+            qexpr    : '{' <expr>* '}' ;                                      \
             expr     : <number> | <symbol> | <sexpr> | <qexpr> ;              \
-            jblisp   : /^/ <expr> */$/ ;                                      \
+            jblisp   : /^/ <expr>* /$/ ;                                      \
         ",
         Number, Symbol, Sexpr, Qexpr, Expr, JBLisp
     );
