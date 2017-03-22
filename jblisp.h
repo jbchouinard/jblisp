@@ -3,6 +3,13 @@
 
 #include "mpc.h"
 
+mpc_parser_t *Number;
+mpc_parser_t *Symbol;
+mpc_parser_t *Sexpr;
+mpc_parser_t *Qexpr;
+mpc_parser_t *Expr;
+mpc_parser_t *JBLisp;
+
 struct lval;
 typedef struct lval lval;
 struct lenv;
@@ -11,6 +18,9 @@ typedef lval *(*lbuiltin)(lenv*, lval*);
 
 lenv *lenv_new(void);
 void lenv_del(lenv*);
+void lenv_put(lenv*, char*, lval*);
+lval *lenv_get(lenv*, char*);
+lval *lenv_take(lenv*, char*);
 
 lval* lval_dbl(double);
 lval* lval_lng(long);
@@ -57,6 +67,6 @@ lval* lval_eval_sexpr(lval*);
 
 void exec_line(char*);
 void exec_file(char*);
-int main(int, char**);
+void build_parser(void);
 
 #endif
