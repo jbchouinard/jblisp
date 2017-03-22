@@ -172,6 +172,51 @@ lval *lval_proc(lbuiltin proc) {
     return v;
 }
 
+int lval_is(lval *v, lval *w) {
+    if (v->type == w->type) {
+        return v == w;
+    } else {
+        return 0;
+    }
+}
+
+int lval_equal(lval *v, lval *w) {
+    int eq = 0;
+    if (v->type != w->type) {
+        return eq;
+    }
+    switch(v->type) {
+        case LVAL_DBL:
+            eq = v->val.dbl == w->val.dbl;
+            break;
+        case LVAL_LNG:
+            eq = v->val.lng == w->val.lng;
+            break;
+        case LVAL_ERR:
+            eq = v == w;
+            break;
+        case LVAL_SYM:
+            eq = !(strcmp(v->val.sym, w->val.sym));
+            break;
+        case LVAL_PROC:
+            eq = v->val.proc == w->val.proc;
+            break;
+        case LVAL_SEXPR:
+        case LVAL_QEXPR:
+            if (v->count == w->count) {
+                eq = 1;
+                for (int i=0; i < v->count; i++) {
+                    if (!lval_equal(v->val.cell[i], w->val.cell[i])) {
+                        eq = 0;
+                        break;
+                    }
+                }
+            }
+            break;
+    }
+    return eq;
+}
+
 void lval_del(lval *v) {
     switch(v->type) {
         case LVAL_DBL:
@@ -623,6 +668,22 @@ lval *builtin_c__r(lval *a, char *func) {
     return lval_take(a, 0);
 }
 
+lval *builtin_equal(lval *a) {
+    LASSERT_ARGC("equal?", a, 2);
+
+    int eq = lval_equal(a->val.cell[0], a->val.cell[1]);
+    lval_del(a);
+    return lval_lng((long) eq);
+}
+
+lval *builtin_is(lval *a) {
+    LASSERT_ARGC("equal?", a, 2);
+
+    lval *v = a->val.cell[1];
+    lval *w = lval_take(a, 0);
+    return lval_lng(lval_is(v, w));
+}
+
 lval *builtin(lval *a, char *func) {
     if (strcmp("list", func) == 0) return builtin_list(a);
     if (strcmp("join", func) == 0) return builtin_join(a);
@@ -634,6 +695,8 @@ lval *builtin(lval *a, char *func) {
     if (strcmp("len", func) == 0) return builtin_len(a);
     if (strcmp("init", func) == 0) return builtin_init(a);
     if (strcmp("last", func) == 0) return builtin_last(a);
+    if (strcmp("is?", func) == 0) return builtin_is(a);
+    if (strcmp("equal?", func) == 0) return builtin_equal(a);
     if (strcmp("and", func) == 0) return builtin_op(a, func);
     if (strcmp("or", func) == 0) return builtin_op(a, func);
     if (strcmp("not", func) == 0) return builtin_op(a, func);
@@ -720,7 +783,7 @@ void build_parser() {
     mpca_lang(MPCA_LANG_DEFAULT,
         "                                                                     \
             number   : /((-?[0-9]*[.][0-9]+)|(-?[0-9]+[.]?))([eE]-?[0-9]+)?/ ;\
-            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;                     \
+            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&?]+/ ;                    \
             sexpr    : '(' <expr>* ')' ;                                      \
             qexpr    : '{' <expr>* '}' ;                                      \
             expr     : <number> | <symbol> | <sexpr> | <qexpr> ;              \

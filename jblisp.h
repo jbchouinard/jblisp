@@ -35,6 +35,8 @@ lval* lval_insert(lval*, lval*, int);
 lval* lval_take(lval*, int);
 lval* lval_copy(lval*);
 void lval_del(lval*);
+int lval_equal(lval*, lval*);
+int lval_is(lval*, lval*);
 
 void lval_print(lval*);
 void lval_println(lval*);
@@ -53,6 +55,8 @@ lval* builtin_cdr(lval*);
 lval* builtin_nth(lval*);
 lval* builtin_min(lval*);
 lval* builtin_max(lval*);
+lval* builtin_equal(lval*);
+lval* builtin_is(lval*);
 lval* builtin_init(lval*);
 lval* builtin_last(lval*);
 lval* builtin_c__r(lval*, char*);
