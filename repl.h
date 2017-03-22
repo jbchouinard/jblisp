@@ -5,36 +5,55 @@
 
 struct lval;
 typedef struct lval lval;
-lval* lval_dbl(double x);
-lval* lval_lng(long x);
-lval* lval_err(char* m);
+struct lenv;
+typedef struct len lenv;
+typedef lval *(*lbuiltin)(lenv*, lval*);
+
+lval* lval_dbl(double);
+lval* lval_lng(long);
+lval* lval_err(char*);
 lval* lval_sexpr(void);
 lval* lval_qexpr(void);
-lval* lval_sym(char* s);
-void lval_del(lval* v);
-lval* lval_add(lval* p, lval* c);
-lval* lval_read_num(mpc_ast_t* ast);
-lval* lval_read(mpc_ast_t* ast);
-void lval_print_expr(lval* v, char open, char close);
-void lval_print(lval* v);
-void lval_println(lval* v);
-lval* lval_pop(lval* v, int n);
-lval* lval_take(lval* v, int n);
-lval* lval_to_dbl(lval* v);
-lval* builtin_op_dbl(lval* x, lval* y, char* op);
-lval* builtin_op_lng(lval* x, lval* y, char* op);
-lval* builtin_op(lval* a, char* op);
-lval* builtin_list(lval* a);
-lval* builtin_eval(lval* a);
-lval* builtin_join(lval* a);
-lval* builtin_cons(lval* a);
-lval* builtin_car(lval* a);
-lval* builtin_cdr(lval* a);
-lval* builtin_init(lval* a);
-lval* builtin_last(lval* a);
-lval* builtin_c__r(lval* a, char* func);
-lval* builtin(lval* a, char* func);
-lval* lval_eval_sexpr(lval* v);
-lval* lval_eval(lval* v);
-int main(int argc, char** argv);
+lval* lval_sym(char*);
+lval* lval_proc(lbuiltin);
+
+lval* lval_add(lval*, lval*);
+lval* lval_pop(lval*, int);
+lval* lval_insert(lval*, lval*, int);
+lval* lval_take(lval*, int);
+lval* lval_copy(lval*);
+void lval_del(lval*);
+lval* lval_to_dbl(lval*);
+
+void lval_print(lval*);
+void lval_println(lval*);
+void lval_print_expr(lval*, char, char);
+
+lval* builtin_op(lval*, char*);
+lval* builtin_op_dbl(lval*, lval*, char*);
+lval* builtin_op_lng(lval*, lval*, char*);
+lval* builtin_list(lval*);
+lval* builtin_eval(lval*);
+lval* builtin_join(lval*);
+lval* builtin_cons(lval*);
+lval* builtin_len(lval*);
+lval* builtin_car(lval*);
+lval* builtin_cdr(lval*);
+lval* builtin_nth(lval*);
+lval* builtin_min(lval*);
+lval* builtin_max(lval*);
+lval* builtin_init(lval*);
+lval* builtin_last(lval*);
+lval* builtin_c__r(lval*, char*);
+lval* builtin(lval*, char*);
+
+lval* lval_read(mpc_ast_t*);
+lval* lval_read_num(mpc_ast_t*);
+lval* lval_eval(lval*);
+lval* lval_eval_sexpr(lval*);
+
+void exec_line(char*);
+void exec_file(char*);
+int main(int, char**);
+
 #endif
