@@ -283,7 +283,7 @@ lval *lval_insert(lval *x, lval *v, int n) {
         x->size = x->size == 0 ? x->count : x->size  *2;
         x->val.cell = realloc(x->val.cell, sizeof(lval*)  *x->size);
     }
-    memmove(x->val.cell+n+1, x->val.cell+n, (x->count-n-1)  *sizeof(lval*));
+    memmove(x->val.cell+n+1, x->val.cell+n, (x->count-n-1) * sizeof(lval*));
     x->val.cell[n] = v;
     return x;
 }
