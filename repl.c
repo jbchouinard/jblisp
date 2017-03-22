@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -12,12 +13,24 @@
 #define LASSERT(args, cond, err) \
     if (!(cond)) { lval_del(args); return lval_err(err); }
 
-#define LASSERTARGC(fname, exp, argc)                                          \
-    char msg[100];                                                             \
-    if (argc != exp) {                                                         \
+#define LASSERT_ARGC(fname, args, argc)                                        \
+    if (args->count != argc) {                                                 \
+        char msg[100];                                                         \
         snprintf(msg, (size_t) 100,                                            \
                  "Function '%s' expected %i argument(s), got %i.",             \
-                 fname, exp, argc);                                            \
+                 fname, argc, args->count);                                    \
+        lval_del(args);                                                        \
+        return lval_err(msg);                                                  \
+    }
+
+#define LASSERT_ARGT(fname, args, idx, exp_type)                               \
+    if (args->val.cell[idx]->type != exp_type) {                               \
+        char msg[100];                                                         \
+        snprintf(msg, (size_t) 100,                                            \
+                 "Function '%s' expected argument %i of type '%s', got '%s'.", \
+                 fname, idx, TYPE_NAMES[exp_type],                             \
+                 TYPE_NAMES[args->val.cell[idx]->type]);                       \
+        lval_del(args);                                                        \
         return lval_err(msg);                                                  \
     }
 
@@ -30,6 +43,9 @@ mpc_parser_t *Expr;
 mpc_parser_t *JBLisp;
 
 // Lisp Value (lval) type
+char* TYPE_NAMES[] = {
+    "integer", "decimal", "error", "symbol", "s-expression", "q-expression"
+};
 struct lval {
     enum { LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR } type;
     int count;
@@ -365,9 +381,20 @@ lval *builtin_op(lval *a, char *op) {
 }
 
 lval *builtin_car(lval *a) {
-    LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Type Error - function 'car' expected a Q expression.");
-    LASSERTARGC("car", 1, a->count)
+    LASSERT_ARGC("car", a, 1);
+    LASSERT_ARGT("car", a, 0, LVAL_QEXPR);
+    LASSERT(a, a->val.cell[0]->count != 0,
+        "Function 'car' undefined on empty list '{}'.");
+
+    // Delete all but first cell
+    lval *v = lval_take(a, 0);
+    return lval_take(v, 0);
+}
+
+lval *builtin_nth(lval *a) {
+    LASSERT_ARGC("nth", a, 2)
+    LASSERT_ARGT("car", a, 0, LVAL_QEXPR);
+    LASSERT_ARGT("car", a, 1, LVAL_LNG);
     LASSERT(a, a->val.cell[0]->count != 0,
         "Function 'car' undefined on empty list '{}'.");
 
@@ -377,7 +404,7 @@ lval *builtin_car(lval *a) {
 }
 
 lval *builtin_cdr(lval *a) {
-    LASSERTARGC("cdr", 1, a->count)
+    LASSERT_ARGC("cdr", a, 1)
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Type Error - function 'cdr' expected a Q expression.");
     LASSERT(a, a->val.cell[0]->count != 0,
@@ -397,7 +424,7 @@ lval *builtin_list(lval *a) {
 }
 
 lval *builtin_eval(lval *a) {
-    LASSERTARGC("eval", 1, a->count);
+    LASSERT_ARGC("eval", a, 1);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Function 'eval' expected a Q expression");
 
@@ -426,7 +453,7 @@ lval *builtin_join(lval *a) {
 }
 
 lval *builtin_cons(lval *a) {
-    LASSERTARGC("cons", 2, a->count);
+    LASSERT_ARGC("cons", a, 2);
     LASSERT(a, a->val.cell[1]->type == LVAL_QEXPR,
         "Second argument to 'cons' must be a Q expression.");
     lval *x = lval_pop(a, 0);
@@ -436,7 +463,7 @@ lval *builtin_cons(lval *a) {
 }
 
 lval *builtin_len(lval *a) {
-    LASSERTARGC("len", 1, a->count);
+    LASSERT_ARGC("len", a, 1);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Function 'len' only applies to Q expressions.");
     lval *x = lval_lng(a->val.cell[0]->count);
@@ -445,7 +472,7 @@ lval *builtin_len(lval *a) {
 }
 
 lval *builtin_init(lval *a) {
-    LASSERTARGC("init", 1, a->count);
+    LASSERT_ARGC("init", a, 1);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Function 'init' only applies to Q expressions.");
 
@@ -456,7 +483,7 @@ lval *builtin_init(lval *a) {
 }
 
 lval *builtin_last(lval *a) {
-    LASSERTARGC("last", 1, a->count);
+    LASSERT_ARGC("last", a, 1);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Function 'last' only applies to Q expressions.");
 
