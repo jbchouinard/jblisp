@@ -60,6 +60,7 @@ struct lval {
         char *err;
         char *sym;
         struct lval **cell;
+        lbuiltin proc;
     } val;
 };
 
@@ -114,6 +115,13 @@ lval *lval_sym(char *s) {
     return v;
 }
 
+lval *lval_proc(lbuiltin proc) {
+    lval *v = malloc(sizeof(lval));
+    v->type = LVAL_PROC;
+    v->val.proc = proc;
+    return v;
+}
+
 void lval_del(lval *v) {
     switch(v->type) {
         case LVAL_DBL:
@@ -125,6 +133,8 @@ void lval_del(lval *v) {
             break;
         case LVAL_SYM:
             free(v->val.sym);
+            break;
+        case LVAL_PROC:
             break;
         case LVAL_SEXPR:
         case LVAL_QEXPR:
@@ -242,6 +252,8 @@ void lval_print(lval *v) {
         case LVAL_QEXPR:
             lval_print_expr(v, '{', '}');
             break;
+        case LVAL_PROC:
+            printf("<procedure at %p>", (void*) &v);
         case LVAL_ERR:
             printf("Error: %s", v->val.err);
             break;
