@@ -64,6 +64,12 @@ struct lval {
     } val;
 };
 
+struct lenv {
+    int count;
+    char **syms;
+    lval **vals;
+};
+
 // Operator associativity types
 enum { ASSOC_RIGHT, ASSOC_LEFT };
 
@@ -144,6 +150,40 @@ void lval_del(lval *v) {
             break;
     }
     free(v);
+}
+
+lval *lval_copy(lval *v) {
+    lval *x = malloc(sizeof(lval));
+    x->type = v->type;
+
+    switch (v->type) {
+        case LVAL_DBL:
+            x->val.dbl = v->val.dbl;
+            break;
+        case LVAL_LNG:
+            x->val.lng = v->val.lng;
+            break;
+        case LVAL_ERR:
+            x->val.err = malloc(strlen(v->val.err) + 1);
+            strcpy(x->val.err, v->val.err);
+            break;
+        case LVAL_SYM:
+            x->val.sym = malloc(strlen(v->val.sym) + 1);
+            strcpy(x->val.sym, v->val.sym);
+            break;
+        case LVAL_PROC:
+            x->val.proc = v->val.proc;
+            break;
+        case LVAL_SEXPR:
+        case LVAL_QEXPR:
+            x->count = v->count;
+            x->val.cell = malloc(sizeof(lval*) * x->count);
+            for (int i=0; i < v->count; i++) {
+                x->val.cell[i] = lval_copy(v->val.cell[i]);
+            }
+            break;
+    }
+    return x;
 }
 
 lval *lval_insert(lval *x, lval *v, int n) {
