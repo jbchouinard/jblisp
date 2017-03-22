@@ -805,8 +805,27 @@ lval *builtin_not(lenv* e, lval *a) {
     return b;
 }
 
+lval *builtin_def(lenv* e, lval *a) {
+    LASSERT_ARGC("def", a, 2);
+    LASSERT_ARGT("def", a, 0, LVAL_QEXPR);
+
+    lval* q = lval_pop(a, 0);
+    LASSERT(a, q->count == 1,
+            "First argument to 'def' must be a singleton Q-expression");
+    lval* k = lval_take(q, 0);
+
+    lval* v = lval_take(a, 0);
+    lenv_put(e, k->val.sym, v);
+    lval_del(k);
+    return v;
+}
+
 void add_builtins(lenv *e) {
-    // List
+    lenv_put(e, "def", lval_proc(builtin_def));
+    lenv_put(e, "equal?", lval_proc(builtin_equal));
+    lenv_put(e, "is?", lval_proc(builtin_is));
+
+    // List procedures
     lenv_put(e, "list", lval_proc(builtin_list));
     lenv_put(e, "eval", lval_proc(builtin_eval));
     lenv_put(e, "join", lval_proc(builtin_join));
@@ -818,7 +837,7 @@ void add_builtins(lenv *e) {
     lenv_put(e, "last", lval_proc(builtin_last));
     lenv_put(e, "nth", lval_proc(builtin_nth));
 
-    // Math
+    // Arithmetic
     lenv_put(e, "+", lval_proc(builtin_add));
     lenv_put(e, "-", lval_proc(builtin_sub));
     lenv_put(e, "*", lval_proc(builtin_mul));
@@ -828,9 +847,7 @@ void add_builtins(lenv *e) {
     lenv_put(e, "min", lval_proc(builtin_min));
     lenv_put(e, "max", lval_proc(builtin_max));
 
-    // Logic
-    lenv_put(e, "equal?", lval_proc(builtin_equal));
-    lenv_put(e, "is?", lval_proc(builtin_is));
+    // Logic functions
     lenv_put(e, "and", lval_proc(builtin_and));
     lenv_put(e, "or", lval_proc(builtin_or));
     lenv_put(e, "not", lval_proc(builtin_not));
