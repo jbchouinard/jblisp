@@ -16,7 +16,7 @@ typedef lval *(*lbuiltin)(lenv*, lval*);
 
 lenv *lenv_new(void);
 lval *lenv_get(lenv*, char*);
-lval *lenv_take(lenv*, char*);
+lval *lenv_pop(lenv*, char*);
 void lenv_del(lenv*);
 void lenv_put(lenv*, char*, lval*);
 

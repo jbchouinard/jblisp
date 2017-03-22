@@ -85,9 +85,9 @@ void lenv_del(lenv *e) {
 
 void lenv_put(lenv *e, char *sym, lval *v) {
     int i = 0;
-    int cmp;
+    int cmp = 1;
 
-    while((cmp = strcmp(e->syms[i], sym)) != 0 && i < e->count) {
+    while(i < e->count && (cmp = strcmp(e->syms[i], sym)) != 0) {
         i++;
     }
     if (cmp == 0) {
@@ -104,17 +104,46 @@ void lenv_put(lenv *e, char *sym, lval *v) {
             e->syms = realloc(e->syms, sizeof(char*) * e->size);
             e->vals = realloc(e->vals, sizeof(lval*) * e->size);
         }
-        e->syms[e->count-1] = sym;
-        e->vals[e->count-1] = v;
+        e->syms[e->count-1] = malloc(strlen(sym) + 1);
+        strcpy(e->syms[e->count-1], sym);
+        e->vals[e->count-1] = lval_copy(v);
     }
 }
 
 lval *lenv_get(lenv *e, char *sym) {
-    return (lval*) NULL;
+    int i = 0;
+    int cmp = 1;
+
+    while(i < e->count && (cmp = strcmp(e->syms[i], sym)) != 0) {
+        i++;
+    }
+
+    if (cmp == 0) {
+        return e->vals[i];
+    } else {
+        return (lval*) NULL;
+    }
 }
 
-lval *lenv_take(lenv *e, char *sym) {
-    return NULL;
+lval *lenv_pop(lenv *e, char *sym) {
+    int i = 0;
+    int cmp = 1;
+
+    while(i < e->count && (cmp = strcmp(e->syms[i], sym)) != 0) {
+        i++;
+    }
+    if (cmp == 0) {
+        e->count--;
+        lval* v = e->vals[i];
+        int to_move = e->count - i;
+        if (to_move) {
+            memmove(e->syms[i], e->syms[i+1], to_move * sizeof(char*));
+            memmove(e->vals[i], e->vals[i+1], to_move * sizeof(lval*));
+        }
+        return v;
+    } else {
+        return (lval*) NULL;
+    }
 }
 
 lval *lval_dbl(double x) {
