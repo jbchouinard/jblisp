@@ -3,24 +3,22 @@
 
 #include "mpc.h"
 
-mpc_parser_t *Number;
-mpc_parser_t *Symbol;
-mpc_parser_t *Sexpr;
-mpc_parser_t *Qexpr;
-mpc_parser_t *Expr;
-mpc_parser_t *JBLisp;
+extern mpc_parser_t *Number;
+extern mpc_parser_t *Symbol;
+extern mpc_parser_t *Sexpr;
+extern mpc_parser_t *Qexpr;
+extern mpc_parser_t *Expr;
+extern mpc_parser_t *JBLisp;
 
-struct lval;
-typedef struct lval lval;
-struct lenv;
-typedef struct lenv lenv;
+typedef struct _lval lval;
+typedef struct _lenv lenv;
 typedef lval *(*lbuiltin)(lenv*, lval*);
 
 lenv *lenv_new(void);
-void lenv_del(lenv*);
-void lenv_put(lenv*, char*, lval*);
 lval *lenv_get(lenv*, char*);
 lval *lenv_take(lenv*, char*);
+void lenv_del(lenv*);
+void lenv_put(lenv*, char*, lval*);
 
 lval* lval_dbl(double);
 lval* lval_lng(long);
@@ -29,6 +27,7 @@ lval* lval_sexpr(void);
 lval* lval_qexpr(void);
 lval* lval_sym(char*);
 lval* lval_proc(lbuiltin);
+lval* lval_to_dbl(lval*);
 
 lval* lval_add(lval*, lval*);
 lval* lval_pop(lval*, int);
@@ -36,7 +35,6 @@ lval* lval_insert(lval*, lval*, int);
 lval* lval_take(lval*, int);
 lval* lval_copy(lval*);
 void lval_del(lval*);
-lval* lval_to_dbl(lval*);
 
 void lval_print(lval*);
 void lval_println(lval*);

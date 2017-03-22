@@ -4,6 +4,13 @@
 #include "mpc.h"
 #include "jblisp.h"
 
+mpc_parser_t *Number;
+mpc_parser_t *Symbol;
+mpc_parser_t *Sexpr;
+mpc_parser_t *Qexpr;
+mpc_parser_t *Expr;
+mpc_parser_t *JBLisp;
+
 #define LASSERT(args, cond, err) \
     if (!(cond)) { lval_del(args); return lval_err(err); }
 
@@ -36,7 +43,7 @@ char* TYPE_NAMES[] = {
     "procedure", "s-expression", "q-expression"
 };
 
-struct lval {
+struct _lval {
     int type;
     int count;
     int size;
@@ -45,12 +52,12 @@ struct lval {
         long lng;
         char *err;
         char *sym;
-        struct lval **cell;
+        lval **cell;
         lbuiltin proc;
     } val;
 };
 
-struct lenv {
+struct _lenv {
     int count;
     int size;
     char **syms;
