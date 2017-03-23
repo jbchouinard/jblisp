@@ -38,7 +38,7 @@ mpc_parser_t *JBLisp;
 
 // Lisp types
 enum { LVAL_BOOL, LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM,
-       LVAL_PROC, LVAL_LAMBDA, LVAL_SEXPR, LVAL_QEXPR };
+       LVAL_BUILTIN, LVAL_LAMBDA, LVAL_SEXPR, LVAL_QEXPR };
 char* TYPE_NAMES[] = {
     "boolean", "integer", "float", "error", "symbol",
     "builtin procedure", "lambda procedure", "S-expression", "Q-expression"
@@ -66,9 +66,6 @@ struct _lenv {
     char **syms;
     lval **vals;
 };
-
-// Operator associativity types
-enum { ASSOC_RIGHT, ASSOC_LEFT };
 
 lenv *lenv_new(void) {
     lenv *e = malloc(sizeof(lenv));
@@ -189,7 +186,7 @@ lval *lval_sym(char *s) {
 
 lval *lval_proc(lbuiltin proc) {
     lval *v = malloc(sizeof(lval));
-    v->type = LVAL_PROC;
+    v->type = LVAL_BUILTIN;
     v->val.proc = proc;
     return v;
 }
@@ -232,7 +229,7 @@ int lval_equal(lval *v, lval *w) {
         case LVAL_SYM:
             eq = !(strcmp(v->val.sym, w->val.sym));
             break;
-        case LVAL_PROC:
+        case LVAL_BUILTIN:
             eq = v->val.proc == w->val.proc;
             break;
         case LVAL_SEXPR:
@@ -270,7 +267,7 @@ void lval_del(lval *v) {
         case LVAL_BOOL:
         case LVAL_DBL:
         case LVAL_LNG:
-        case LVAL_PROC:
+        case LVAL_BUILTIN:
             break;
         case LVAL_ERR:
             free(v->val.err);
@@ -311,7 +308,7 @@ lval *lval_copy(lval *v) {
             x->val.sym = malloc(strlen(v->val.sym) + 1);
             strcpy(x->val.sym, v->val.sym);
             break;
-        case LVAL_PROC:
+        case LVAL_BUILTIN:
             x->val.proc = v->val.proc;
             break;
         case LVAL_SEXPR:
@@ -436,7 +433,7 @@ void lval_print(lval *v) {
         case LVAL_QEXPR:
             lval_print_expr(v, '{', '}');
             break;
-        case LVAL_PROC:
+        case LVAL_BUILTIN:
             printf("<builtin procedure at %p>", (void*) v->val.proc);
             break;
         case LVAL_LAMBDA:
@@ -516,6 +513,9 @@ lval *builtin_arith_lng(lval *x, lval *y, char *op) {
     lval_del(y);
     return x;
 }
+
+// Operator associativity types
+enum { ASSOC_RIGHT, ASSOC_LEFT };
 
 lval *builtin_arith(lval *a, char *op) {
     if (a->type == LVAL_ERR) return a;
@@ -862,7 +862,7 @@ void add_builtins(lenv *e) {
     lenv_put(e, "def", lval_proc(builtin_def));
     lenv_put(e, "equal?", lval_proc(builtin_equal));
     lenv_put(e, "is?", lval_proc(builtin_is));
-    lenv_put(e, "lambda", lval_proc(builtin_lambda));
+    lenv_put(e, "\\", lval_proc(builtin_lambda));
 
     // List procedures
     lenv_put(e, "list", lval_proc(builtin_list));
@@ -905,7 +905,7 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
     if (proc->type == LVAL_ERR) {
         lval_del(v);
         return proc;
-    } else if (proc->type == LVAL_PROC) {
+    } else if (proc->type == LVAL_BUILTIN) {
         lval *result = proc->val.proc(e, v);
         lval_del(proc);
         return result;
