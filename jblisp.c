@@ -15,25 +15,30 @@ mpc_parser_t *JBLisp;
 #define LASSERT(args, cond, err) \
     if (!(cond)) { lval_del(args); return lval_err(err); }
 
-#define LASSERT_ARGC(fname, args, argc)                                        \
-    if (args->count != argc) {                                                 \
-        char msg[100];                                                         \
-        snprintf(msg, (size_t) 100,                                            \
-                 "Procedure '%s' expected %i argument(s), got %i.",            \
-                 fname, argc, args->count);                                    \
-        lval_del(args);                                                        \
-        return lval_err(msg);                                                  \
+#define LASSERT_ARGC(fname, args, argc)                        \
+    if (args->count != argc) {                                 \
+        lval *err = lval_err(                                  \
+            "Procedure '%s' expected %i argument(s), got %i.", \
+            fname, argc, args->count);                         \
+        lval_del(args);                                        \
+        return err;                                            \
     }
 
-#define LASSERT_ARGT(fname, args, idx, exp_type)                               \
-    if (args->val.cell[idx]->type != exp_type) {                               \
-        char msg[100];                                                         \
-        snprintf(msg, (size_t) 100,                                            \
-                 "Procedure '%s' expected argument %i of type '%s', got '%s'.",\
-                 fname, idx, TYPE_NAMES[exp_type],                             \
-                 TYPE_NAMES[args->val.cell[idx]->type]);                       \
-        lval_del(args);                                                        \
-        return lval_err(msg);                                                  \
+#define LASSERT_ARGT(fname, args, idx, exp_type)                           \
+    if (args->val.cell[idx]->type != exp_type) {                           \
+        lval* err = lval_err(                                              \
+            "Procedure '%s' expected argument %i of type '%s', got '%s'.", \
+            fname, idx, TYPE_NAMES[exp_type],                              \
+            TYPE_NAMES[args->val.cell[idx]->type]);                        \
+        lval_del(args);                                                    \
+        return err;                                                        \
+    }
+
+#define BAIL_IF_ERR(args)                          \
+    for (int i=0; i < args->count; i++) {          \
+        if (args->val.cell[i]->type == LVAL_ERR) { \
+            return lval_take(args, i);             \
+        }                                          \
     }
 
 // Lisp types
@@ -107,32 +112,24 @@ void lenv_put(lenv *e, char *sym, lval *v) {
     e->vals[e->count-1] = lval_copy(v);
 }
 
-lval *_lenv_get(lenv *e, char *sym) {
+lval *lenv_get(lenv *e, char *sym) {
     for (int i=0; i < e->count; i++) {
         if (strcmp(e->syms[i], sym) == 0) {
             return lval_copy(e->vals[i]);
         }
     }
-    return NULL;
-}
-
-lval *lenv_get(lenv *e, char *sym) {
-    lval* v = _lenv_get(e, sym);
-    if (v != NULL) {
-        return v;
-    }
     if (e->encl != NULL) {
         return lenv_get(e->encl, sym);
     }
-    char msg[50];
-    snprintf(msg, 50, "Unbound symbol '%s'.", sym);
-    return lval_err(msg);
+    return lval_err("Unbound symbol '%s'.", sym);
 }
 
 lval *lval_bool(int b) {
     lval *v = malloc(sizeof(lval));
     v->type = LVAL_BOOL;
     v->val.bool = b ? LTRUE : LFALSE;
+    v->count = 0;
+    v->size = 0;
     return v;
 }
 
@@ -140,6 +137,8 @@ lval *lval_dbl(double x) {
     lval *v = malloc(sizeof(lval));
     v->type = LVAL_DBL;
     v->val.dbl = x;
+    v->count = 0;
+    v->size = 0;
     return v;
 }
 
@@ -147,14 +146,24 @@ lval *lval_lng(long x) {
     lval *v = malloc(sizeof(lval));
     v->type = LVAL_LNG;
     v->val.lng = x;
+    v->count = 0;
+    v->size = 0;
     return v;
 }
 
-lval *lval_err(char *m) {
+lval *lval_err(char *fmt, ...) {
+    va_list va;
+    va_start(va, fmt);
+
     lval *v = malloc(sizeof(lval));
     v->type = LVAL_ERR;
-    v->val.err = malloc(strlen(m) + 1);
-    strcpy(v->val.err, m);
+    v->count = 0;
+    v->size = 0;
+    v->val.err = malloc(512);
+    vsnprintf(v->val.err, 511, fmt, va);
+    v->val.err = realloc(v->val.err, strlen(v->val.err)+1);
+
+    va_end(va);
     return v;
 }
 
@@ -179,6 +188,8 @@ lval *lval_qexpr(void) {
 lval *lval_sym(char *s) {
     lval *v = malloc(sizeof(lval));
     v->type = LVAL_SYM;
+    v->count = 0;
+    v->size = 0;
     v->val.sym = malloc(sizeof(strlen(s) + 1));
     strcpy(v->val.sym, s);
     return v;
@@ -187,6 +198,8 @@ lval *lval_sym(char *s) {
 lval *lval_proc(lbuiltin proc) {
     lval *v = malloc(sizeof(lval));
     v->type = LVAL_BUILTIN;
+    v->count = 0;
+    v->size = 0;
     v->val.proc = proc;
     return v;
 }
@@ -362,10 +375,16 @@ lval *lval_read_num(mpc_ast_t *ast) {
         strstr(ast->contents, "E"))
     {
         double x = strtod(ast->contents, NULL);
-        return errno != ERANGE ? lval_dbl(x) : lval_err("invalid number");
+        if (errno == ERANGE) {
+            return lval_err("Invalid number (float): %s.", ast->contents);
+        }
+        return lval_dbl(x);
     } else {
         long x = strtol(ast->contents, NULL, 10);
-        return errno != ERANGE ? lval_lng(x) : lval_err("invalid number");
+        if (errno == ERANGE) {
+            return lval_err("Invalid number (integer): %s.", ast->contents);
+        }
+        return lval_lng(x);
     }
 }
 
@@ -385,7 +404,9 @@ lval *lval_read(mpc_ast_t *ast) {
     else if (strstr(ast->tag, "qexpr"))
         x = lval_qexpr();
     else
-        return lval_err("expected an S or Q expression");
+        return lval_err(
+            "Parser error: '%s' is not a valid type tag.",
+            ast->tag);
 
     for (int i=0; i < ast->children_num; i++) {
         if (strcmp(ast->children[i]->contents, "(") == 0)
@@ -467,7 +488,9 @@ lval *lval_to_dbl(lval *v) {
             break;
         default:
             lval_del(v);
-            v = lval_err("type error: cannot be converted to number");
+            v = lval_err(
+                "Type error: '%s' cannot be converted to number.",
+                TYPE_NAMES[v->type]);
             break;
     }
     return v;
@@ -487,7 +510,9 @@ lval *builtin_arith_dbl(lval *x, lval *y, char *op) {
     }
     else {
         lval_del(x);
-        x = lval_err("bad operator for type LVAL_DBL");
+        x = lval_err(
+            "Bad operator '%s' for type '%s'",
+            op, TYPE_NAMES[LVAL_DBL]);
     }
     lval_del(y);
     return x;
@@ -508,7 +533,9 @@ lval *builtin_arith_lng(lval *x, lval *y, char *op) {
     else if (strcmp(op, "%") == 0) x->val.lng %= y->val.lng;
     else {
         lval_del(x);
-        y = lval_err("bad operator for type LVAL_LNG");
+        x = lval_err(
+            "Bad operator '%s' for type '%s'",
+            op, TYPE_NAMES[LVAL_LNG]);
     }
     lval_del(y);
     return x;
@@ -518,8 +545,6 @@ lval *builtin_arith_lng(lval *x, lval *y, char *op) {
 enum { ASSOC_RIGHT, ASSOC_LEFT };
 
 lval *builtin_arith(lval *a, char *op) {
-    if (a->type == LVAL_ERR) return a;
-
     if (a->count == 0) {
         if (strcmp(op, "+") == 0) {
             lval_del(a);
@@ -528,11 +553,8 @@ lval *builtin_arith(lval *a, char *op) {
             lval_del(a);
             return lval_lng(1);
         } else {
-            char msg[100];
-            snprintf(
-                msg, 100, "Builtin op '%s' takes at least 1 argument.", op);
             lval_del(a);
-            return lval_err(msg);
+            return lval_err("Builtin op '%s' takes at least 1 argument.", op);
         }
     }
 
@@ -542,12 +564,11 @@ lval *builtin_arith(lval *a, char *op) {
         if (a->val.cell[i]->type == LVAL_DBL)
             type = LVAL_DBL;
         else if (a->val.cell[i]->type != LVAL_LNG) {
-            char msg[100];
-            snprintf(msg, 100,
-                    "Builtin op '%s' not applicable on type '%s'.",
-                    op, TYPE_NAMES[a->val.cell[i]->type]);
+            lval *err = lval_err(
+                "Builtin op '%s' not applicable on type '%s'.",
+                op, TYPE_NAMES[a->val.cell[i]->type]);
             lval_del(a);
-            return lval_err(msg);
+            return err;
         }
     }
     if (type == LVAL_DBL) {
@@ -848,13 +869,17 @@ lval *builtin_lambda(lenv* e, lval *a) {
             lval_del(a);
             lval_del(syms);
             return lval_err(
-                "Builtin 'lambda': first argument must be list of symbols");
+                "First argument to lambda must be list of symbols");
         }
+    }
+    lval *q = lval_take(a, 0);
+    if (q->count == 0) {
+        return lval_err("Invalid lambda expression - empty procedure body");
     }
 
     lval* v = lval_lambda();
     lval_add(v, syms);
-    lval_add(v, lval_take(a, 0));
+    lval_add(v, q);
     return v;
 }
 
@@ -899,13 +924,11 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
     for (int i=0; i < v->count; i++) {
         v->val.cell[i] = lval_eval(e, v->val.cell[i]);
     }
+    BAIL_IF_ERR(v);
 
     lval *proc = lval_pop(v, 0);
 
-    if (proc->type == LVAL_ERR) {
-        lval_del(v);
-        return proc;
-    } else if (proc->type == LVAL_BUILTIN) {
+    if (proc->type == LVAL_BUILTIN) {
         lval *result = proc->val.proc(e, v);
         lval_del(proc);
         return result;
@@ -917,7 +940,7 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
             lval_del(syms);
             lval_del(lambda);
             lval_del(v);
-            return lval_err("wrong number of arguments to lambda");
+            return lval_err("Wrong number of arguments to lambda.");
         }
         // Set up lambda env
         lenv *proc_env = lenv_new();
@@ -929,6 +952,7 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
         lval *result;
         while (lambda->count) {
             result = lval_eval(proc_env, lval_pop(lambda, 0));
+            if (result->type == LVAL_ERR) { break; }
         }
         // Cleanup
         lval_del(syms);
@@ -936,16 +960,17 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
         lenv_del(proc_env);
         return result;
     } else {
-        char msg[100];
-        snprintf(msg, 100, "Object of type '%s' is not applicable.",
-                TYPE_NAMES[proc->type]);
+        lval *err = lval_err(
+            "Object of type '%s' is not applicable.", TYPE_NAMES[proc->type]);
         lval_del(proc);
         lval_del(v);
-        return lval_err(msg);
+        return err;
     }
 }
 
 lval *lval_eval(lenv *e, lval *v) {
+    BAIL_IF_ERR(v);
+
     lval *x;
     switch (v->type) {
         case LVAL_SYM:
@@ -965,7 +990,7 @@ lval *lval_eval(lenv *e, lval *v) {
 void exec_file(lenv *e, char *filename) {
     mpc_result_t res;
 
-    printf("Loading file '%s'...", filename);
+    printf("Loading file '%s'...\n", filename);
     if (mpc_parse_contents(filename, JBLisp, &res)) {
         lval *prog = lval_read(res.output);
         mpc_ast_delete(res.output);

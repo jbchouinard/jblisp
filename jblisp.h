@@ -26,7 +26,7 @@ void lenv_put(lenv*, char*, lval*);
 lval* lval_bool(int);
 lval* lval_dbl(double);
 lval* lval_lng(long);
-lval* lval_err(char*);
+lval* lval_err(char*, ...);
 lval* lval_sexpr(void);
 lval* lval_qexpr(void);
 lval* lval_sym(char*);
