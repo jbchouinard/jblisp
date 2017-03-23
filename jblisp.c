@@ -853,10 +853,8 @@ lval *builtin_lambda(lenv* e, lval *a) {
     }
 
     lval* v = lval_lambda();
-    lval_add(v, lval_copy(syms));
-    lval_add(v, lval_copy(a->val.cell[0]));
-    lval_del(syms);
-    lval_del(a);
+    lval_add(v, syms);
+    lval_add(v, lval_take(a, 0));
     return v;
 }
 
