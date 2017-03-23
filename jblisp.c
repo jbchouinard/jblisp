@@ -40,7 +40,7 @@ mpc_parser_t *JBLisp;
 enum { LVAL_BOOL, LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM,
        LVAL_PROC, LVAL_LAMBDA, LVAL_SEXPR, LVAL_QEXPR };
 char* TYPE_NAMES[] = {
-    "boolean", "integer", "decimal", "error", "symbol",
+    "boolean", "integer", "float", "error", "symbol",
     "builtin procedure", "lambda procedure", "S-expression", "Q-expression"
 };
 
