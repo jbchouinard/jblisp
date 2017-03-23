@@ -806,18 +806,29 @@ lval *builtin_not(lenv* e, lval *a) {
 }
 
 lval *builtin_def(lenv* e, lval *a) {
-    LASSERT_ARGC("def", a, 2);
+    LASSERT(a, a->count > 1,
+            "Builtin 'def' expected at least 2 arguments.");
     LASSERT_ARGT("def", a, 0, LVAL_QEXPR);
 
-    lval* q = lval_pop(a, 0);
-    LASSERT(a, q->count == 1,
-            "First argument to 'def' must be a singleton Q-expression");
-    lval* k = lval_take(q, 0);
+    lval *ks = lval_pop(a, 0);
 
-    lval* v = lval_take(a, 0);
-    lenv_put(e, k->val.sym, v);
-    lval_del(k);
-    return v;
+    if (ks->count != a->count) {
+        lval_del(a);
+        lval_del(ks);
+        return lval_err("Builtin 'def': wrong number of symbols.");
+    }
+    for (int i=0; i < ks->count; i++) {
+        if (ks->val.cell[i]->type != LVAL_SYM) {
+            lval_del(a);
+            lval_del(ks);
+            return lval_err("Builtin 'def': only symbols can be defined.");
+        }
+    }
+    for (int i=0; i < ks->count; i++) {
+        lenv_put(e, ks->val.cell[i]->val.sym, a->val.cell[i]);
+    }
+    lval_del(ks);
+    return a;
 }
 
 void add_builtins(lenv *e) {
