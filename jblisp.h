@@ -3,6 +3,8 @@
 
 #include "mpc.h"
 
+#define VERSION "0.3.0"
+
 extern mpc_parser_t *Boolean;
 extern mpc_parser_t *Number;
 extern mpc_parser_t *Symbol;
