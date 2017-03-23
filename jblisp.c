@@ -53,7 +53,7 @@ struct _lval {
         double dbl;
         long lng;
         char *err;
-        char *sym;
+        unsigned long sym;
         lval **cell;
         lbuiltin proc;
     } val;
@@ -62,12 +62,23 @@ struct _lval {
 struct _lenv {
     int count;
     int size;
-    char **syms;
+    unsigned long *syms;
     lval **vals;
 };
 
 // Operator associativity types
 enum { ASSOC_RIGHT, ASSOC_LEFT };
+
+// djb2 hash. Copied from: http://www.cse.yorku.ca/~oz/hash.html 
+unsigned long hash(char *str) {
+    unsigned long hash = 5381;
+    int c;
+
+    while ((c = *str++))
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+    return hash;
+}
 
 lenv *lenv_new(void) {
     lenv *e = malloc(sizeof(lenv));
@@ -80,7 +91,6 @@ lenv *lenv_new(void) {
 
 void lenv_del(lenv *e) {
     for (int i=0; i < e->count; i++) {
-        free(e->syms[i]);
         lval_del(e->vals[i]);
     }
     free(e->syms);
@@ -88,9 +98,9 @@ void lenv_del(lenv *e) {
     free(e);
 }
 
-void lenv_put(lenv *e, char *sym, lval *v) {
+void lenv_put(lenv *e, unsigned long sym, lval *v) {
     for (int i=0; i < e->count; i++) {
-        if (strcmp(e->syms[i], sym) == 0) {
+        if (e->syms[i] == sym) {
             e->vals[i] = lval_copy(v);
             return;
         }
@@ -99,41 +109,40 @@ void lenv_put(lenv *e, char *sym, lval *v) {
     e->count++;
     if (e->count > e->size) {
         e->size = e->size ? e->size * 2 : e->count;
-        e->syms = realloc(e->syms, sizeof(char*) * e->size);
+        e->syms = realloc(e->syms, sizeof(unsigned long) * e->size);
         e->vals = realloc(e->vals, sizeof(lval*) * e->size);
     }
-    e->syms[e->count-1] = malloc(strlen(sym) + 1);
-    strcpy(e->syms[e->count-1], sym);
+    e->syms[e->count-1] = sym;
     e->vals[e->count-1] = lval_copy(v);
 }
 
-lval *lenv_get(lenv *e, char *sym) {
+lval *lenv_get(lenv *e, unsigned long sym) {
     for (int i=0; i < e->count; i++) {
-        if (strcmp(e->syms[i], sym) == 0) {
+        if (e->syms[i] == sym) {
             return lval_copy(e->vals[i]);
         }
     }
     char msg[50];
-    snprintf(msg, 50, "Unbound symbol '%s'.", sym);
+    snprintf(msg, 50, "Unbound symbol '<symbol %lu>'.", sym);
     return lval_err(msg);
 }
 
-lval *lenv_pop(lenv *e, char *sym) {
+lval *lenv_pop(lenv *e, unsigned long sym) {
     for (int i=0; i < e->count; i++) {
-        if (strcmp(e->syms[i], sym) == 0) {
+        if (e->syms[i] == sym) {
             e->count--;
             lval* v = lval_copy(e->vals[i]);
             lval_del(e->vals[i]);
             int to_move = e->count - i;
             if (to_move) {
-                memmove(e->syms[i], e->syms[i+1], to_move * sizeof(char*));
+                memmove(&e->syms[i], &e->syms[i+1], to_move * sizeof(unsigned long));
                 memmove(e->vals[i], e->vals[i+1], to_move * sizeof(lval*));
             }
             return v;
         }
     }
     char msg[50];
-    snprintf(msg, 50, "Unbound symbol '%s'.", sym);
+    snprintf(msg, 50, "Unbound symbol '<symbol %lu>'.", sym);
     return lval_err(msg);
 }
 
@@ -187,8 +196,7 @@ lval *lval_qexpr(void) {
 lval *lval_sym(char *s) {
     lval *v = malloc(sizeof(lval));
     v->type = LVAL_SYM;
-    v->val.sym = malloc(sizeof(strlen(s) + 1));
-    strcpy(v->val.sym, s);
+    v->val.sym = hash(s);
     return v;
 }
 
@@ -226,7 +234,7 @@ int lval_equal(lval *v, lval *w) {
             eq = v == w;
             break;
         case LVAL_SYM:
-            eq = !(strcmp(v->val.sym, w->val.sym));
+            eq = v->val.sym == w->val.sym;
             break;
         case LVAL_PROC:
             eq = v->val.proc == w->val.proc;
@@ -266,12 +274,10 @@ void lval_del(lval *v) {
         case LVAL_DBL:
         case LVAL_LNG:
         case LVAL_PROC:
+        case LVAL_SYM:
             break;
         case LVAL_ERR:
             free(v->val.err);
-            break;
-        case LVAL_SYM:
-            free(v->val.sym);
             break;
         case LVAL_SEXPR:
         case LVAL_QEXPR:
@@ -302,8 +308,7 @@ lval *lval_copy(lval *v) {
             strcpy(x->val.err, v->val.err);
             break;
         case LVAL_SYM:
-            x->val.sym = malloc(strlen(v->val.sym) + 1);
-            strcpy(x->val.sym, v->val.sym);
+            x->val.sym = v->val.sym;
             break;
         case LVAL_PROC:
             x->val.proc = v->val.proc;
@@ -425,7 +430,7 @@ void lval_print(lval *v) {
             printf("%lf", v->val.dbl);
             break;
         case LVAL_SYM:
-            printf("%s", v->val.sym);
+            printf("<symbol %lu>", v->val.sym);
             break;
         case LVAL_SEXPR:
             lval_print_expr(v, '(', ')');
@@ -832,36 +837,36 @@ lval *builtin_def(lenv* e, lval *a) {
 }
 
 void add_builtins(lenv *e) {
-    lenv_put(e, "def", lval_proc(builtin_def));
-    lenv_put(e, "equal?", lval_proc(builtin_equal));
-    lenv_put(e, "is?", lval_proc(builtin_is));
+    lenv_put(e, hash("def"), lval_proc(builtin_def));
+    lenv_put(e, hash("equal?"), lval_proc(builtin_equal));
+    lenv_put(e, hash("is?"), lval_proc(builtin_is));
 
     // List procedures
-    lenv_put(e, "list", lval_proc(builtin_list));
-    lenv_put(e, "eval", lval_proc(builtin_eval));
-    lenv_put(e, "join", lval_proc(builtin_join));
-    lenv_put(e, "cons", lval_proc(builtin_cons));
-    lenv_put(e, "len", lval_proc(builtin_len));
-    lenv_put(e, "head", lval_proc(builtin_head));
-    lenv_put(e, "tail", lval_proc(builtin_tail));
-    lenv_put(e, "init", lval_proc(builtin_init));
-    lenv_put(e, "last", lval_proc(builtin_last));
-    lenv_put(e, "nth", lval_proc(builtin_nth));
+    lenv_put(e, hash("list"), lval_proc(builtin_list));
+    lenv_put(e, hash("eval"), lval_proc(builtin_eval));
+    lenv_put(e, hash("join"), lval_proc(builtin_join));
+    lenv_put(e, hash("cons"), lval_proc(builtin_cons));
+    lenv_put(e, hash("len"), lval_proc(builtin_len));
+    lenv_put(e, hash("head"), lval_proc(builtin_head));
+    lenv_put(e, hash("tail"), lval_proc(builtin_tail));
+    lenv_put(e, hash("init"), lval_proc(builtin_init));
+    lenv_put(e, hash("last"), lval_proc(builtin_last));
+    lenv_put(e, hash("nth"), lval_proc(builtin_nth));
 
     // Arithmetic
-    lenv_put(e, "+", lval_proc(builtin_add));
-    lenv_put(e, "-", lval_proc(builtin_sub));
-    lenv_put(e, "*", lval_proc(builtin_mul));
-    lenv_put(e, "/", lval_proc(builtin_div));
-    lenv_put(e, "%", lval_proc(builtin_mod));
-    lenv_put(e, "^", lval_proc(builtin_exp));
-    lenv_put(e, "min", lval_proc(builtin_min));
-    lenv_put(e, "max", lval_proc(builtin_max));
+    lenv_put(e, hash("+"), lval_proc(builtin_add));
+    lenv_put(e, hash("-"), lval_proc(builtin_sub));
+    lenv_put(e, hash("*"), lval_proc(builtin_mul));
+    lenv_put(e, hash("/"), lval_proc(builtin_div));
+    lenv_put(e, hash("%"), lval_proc(builtin_mod));
+    lenv_put(e, hash("^"), lval_proc(builtin_exp));
+    lenv_put(e, hash("min"), lval_proc(builtin_min));
+    lenv_put(e, hash("max"), lval_proc(builtin_max));
 
     // Logic functions
-    lenv_put(e, "and", lval_proc(builtin_and));
-    lenv_put(e, "or", lval_proc(builtin_or));
-    lenv_put(e, "not", lval_proc(builtin_not));
+    lenv_put(e, hash("and"), lval_proc(builtin_and));
+    lenv_put(e, hash("or"), lval_proc(builtin_or));
+    lenv_put(e, hash("not"), lval_proc(builtin_not));
 }
 
 lval *lval_eval_sexpr(lenv *e, lval *v) {

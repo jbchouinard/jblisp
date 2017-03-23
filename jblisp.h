@@ -13,15 +13,17 @@ extern mpc_parser_t *Qexpr;
 extern mpc_parser_t *Expr;
 extern mpc_parser_t *JBLisp;
 
+unsigned long hash(char*);
+
 typedef struct _lval lval;
 typedef struct _lenv lenv;
 typedef lval *(*lbuiltin)(lenv*, lval*);
 
 lenv *lenv_new(void);
-lval *lenv_get(lenv*, char*);
-lval *lenv_pop(lenv*, char*);
+lval *lenv_get(lenv*, unsigned long);
+lval *lenv_pop(lenv*, unsigned long);
 void lenv_del(lenv*);
-void lenv_put(lenv*, char*, lval*);
+void lenv_put(lenv*, unsigned long, lval*);
 
 lval* lval_bool(int);
 lval* lval_dbl(double);

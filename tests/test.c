@@ -32,13 +32,13 @@ static char *test_lval() {
 static char *test_lenv() {
     lenv *e = lenv_new();
     lval *v = lval_lng(5);
-    lenv_put(e, "foo", v);
-    lval *w = lenv_get(e, "foo");
+    lenv_put(e, hash("foo"), v);
+    lval *w = lenv_get(e, hash("foo"));
     mu_assert(lval_equal(v, w), "GET: Did not get back what we put in the env.");
-    w = lenv_pop(e, "foo");
+    w = lenv_pop(e, hash("foo"));
     mu_assert(lval_equal(v, w), "POP: Did not get back what we put in the env.");
     lval_del(w);
-    w = lenv_get(e, "foo");
+    w = lenv_get(e, hash("foo"));
     mu_assert(!lval_equal(v, w), "POP: Element was not removed from env.");
     lval_del(v);
     lval_del(w);
