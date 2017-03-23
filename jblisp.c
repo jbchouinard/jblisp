@@ -38,10 +38,10 @@ mpc_parser_t *JBLisp;
 
 // Lisp types
 enum { LVAL_BOOL, LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM,
-       LVAL_PROC, LVAL_SEXPR, LVAL_QEXPR };
+       LVAL_PROC, LVAL_LAMBDA, LVAL_SEXPR, LVAL_QEXPR };
 char* TYPE_NAMES[] = {
     "boolean", "integer", "decimal", "error", "symbol",
-    "procedure", "s-expression", "q-expression"
+    "builtin procedure", "lambda procedure", "S-expression", "Q-expression"
 };
 
 struct _lval {
@@ -62,6 +62,7 @@ struct _lval {
 struct _lenv {
     int count;
     int size;
+    lenv *encl; // enclosing environment
     char **syms;
     lval **vals;
 };
@@ -73,6 +74,7 @@ lenv *lenv_new(void) {
     lenv *e = malloc(sizeof(lenv));
     e->count = 0;
     e->size = 0;
+    e->encl = NULL;
     e->syms = NULL;
     e->vals = NULL;
     return e;
@@ -91,6 +93,7 @@ void lenv_del(lenv *e) {
 void lenv_put(lenv *e, char *sym, lval *v) {
     for (int i=0; i < e->count; i++) {
         if (strcmp(e->syms[i], sym) == 0) {
+            lval_del(e->vals[i]);
             e->vals[i] = lval_copy(v);
             return;
         }
@@ -107,30 +110,22 @@ void lenv_put(lenv *e, char *sym, lval *v) {
     e->vals[e->count-1] = lval_copy(v);
 }
 
-lval *lenv_get(lenv *e, char *sym) {
+lval *_lenv_get(lenv *e, char *sym) {
     for (int i=0; i < e->count; i++) {
         if (strcmp(e->syms[i], sym) == 0) {
             return lval_copy(e->vals[i]);
         }
     }
-    char msg[50];
-    snprintf(msg, 50, "Unbound symbol '%s'.", sym);
-    return lval_err(msg);
+    return NULL;
 }
 
-lval *lenv_pop(lenv *e, char *sym) {
-    for (int i=0; i < e->count; i++) {
-        if (strcmp(e->syms[i], sym) == 0) {
-            e->count--;
-            lval* v = lval_copy(e->vals[i]);
-            lval_del(e->vals[i]);
-            int to_move = e->count - i;
-            if (to_move) {
-                memmove(e->syms[i], e->syms[i+1], to_move * sizeof(char*));
-                memmove(e->vals[i], e->vals[i+1], to_move * sizeof(lval*));
-            }
-            return v;
-        }
+lval *lenv_get(lenv *e, char *sym) {
+    lval* v = _lenv_get(e, sym);
+    if (v != NULL) {
+        return v;
+    }
+    if (e->encl != NULL) {
+        return lenv_get(e->encl, sym);
     }
     char msg[50];
     snprintf(msg, 50, "Unbound symbol '%s'.", sym);
@@ -199,6 +194,15 @@ lval *lval_proc(lbuiltin proc) {
     return v;
 }
 
+lval *lval_lambda(void) {
+    lval *v = malloc(sizeof(lval));
+    v->type = LVAL_LAMBDA;
+    v->val.cell = NULL;
+    v->count = 0;
+    v->size = 0;
+    return v;
+}
+
 int lval_is(lval *v, lval *w) {
     if (v->type == w->type) {
         return v == w;
@@ -233,6 +237,7 @@ int lval_equal(lval *v, lval *w) {
             break;
         case LVAL_SEXPR:
         case LVAL_QEXPR:
+        case LVAL_LAMBDA:
             if (v->count == w->count) {
                 eq = 1;
                 for (int i=0; i < v->count; i++) {
@@ -275,6 +280,7 @@ void lval_del(lval *v) {
             break;
         case LVAL_SEXPR:
         case LVAL_QEXPR:
+        case LVAL_LAMBDA:
             for (int i=0; i < v->count; i++)
                 lval_del(v->val.cell[i]);
             free(v->val.cell);
@@ -310,6 +316,7 @@ lval *lval_copy(lval *v) {
             break;
         case LVAL_SEXPR:
         case LVAL_QEXPR:
+        case LVAL_LAMBDA:
             x->count = v->count;
             x->val.cell = malloc(sizeof(lval*) * x->count);
             for (int i=0; i < v->count; i++) {
@@ -341,10 +348,6 @@ lval *lval_pop(lval *v, int n) {
     lval *res = v->val.cell[n];
     memmove(v->val.cell+n, v->val.cell+n+1, (v->count-n-1)  *sizeof(lval*));
     v->count--;
-    if (v->size > 2  *v->count) {
-        v->val.cell = realloc(v->val.cell, sizeof(lval*)  *v->count);
-        v->size = v->count;
-    }
     return res;
 }
 
@@ -434,7 +437,10 @@ void lval_print(lval *v) {
             lval_print_expr(v, '{', '}');
             break;
         case LVAL_PROC:
-            printf("<procedure at %p>", (void*) v->val.proc);
+            printf("<builtin procedure at %p>", (void*) v->val.proc);
+            break;
+        case LVAL_LAMBDA:
+            printf("<lambda procedure>");
             break;
         case LVAL_ERR:
             printf("Error: %s", v->val.err);
@@ -831,10 +837,34 @@ lval *builtin_def(lenv* e, lval *a) {
     return a;
 }
 
+lval *builtin_lambda(lenv* e, lval *a) {
+    LASSERT_ARGC("lambda", a, 2);
+    LASSERT_ARGT("lambda", a, 0, LVAL_QEXPR);
+    LASSERT_ARGT("lambda", a, 1, LVAL_QEXPR);
+
+    lval *syms = lval_pop(a, 0);
+    for (int i=0; i < syms->count; i++) {
+        if (syms->val.cell[i]->type != LVAL_SYM) {
+            lval_del(a);
+            lval_del(syms);
+            return lval_err(
+                "Builtin 'lambda': first argument must be list of symbols");
+        }
+    }
+
+    lval* v = lval_lambda();
+    lval_add(v, lval_copy(syms));
+    lval_add(v, lval_copy(a->val.cell[0]));
+    lval_del(syms);
+    lval_del(a);
+    return v;
+}
+
 void add_builtins(lenv *e) {
     lenv_put(e, "def", lval_proc(builtin_def));
     lenv_put(e, "equal?", lval_proc(builtin_equal));
     lenv_put(e, "is?", lval_proc(builtin_is));
+    lenv_put(e, "lambda", lval_proc(builtin_lambda));
 
     // List procedures
     lenv_put(e, "list", lval_proc(builtin_list));
@@ -877,8 +907,37 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
     if (proc->type == LVAL_ERR) {
         lval_del(v);
         return proc;
-    }
-    if (proc->type != LVAL_PROC) {
+    } else if (proc->type == LVAL_PROC) {
+        lval *result = proc->val.proc(e, v);
+        lval_del(proc);
+        return result;
+    } else if (proc->type == LVAL_LAMBDA) {
+        // Set up lambda
+        lval *syms = lval_pop(proc, 0);
+        lval *lambda = lval_take(proc, 0);
+        if (syms->count != v->count) {
+            lval_del(syms);
+            lval_del(lambda);
+            lval_del(v);
+            return lval_err("wrong number of arguments to lambda");
+        }
+        // Set up lambda env
+        lenv *proc_env = lenv_new();
+        proc_env->encl = e;
+        for (int i=0; i < syms->count; i++) {
+            lenv_put(proc_env, syms->val.cell[i]->val.sym, v->val.cell[i]);
+        }
+        // Evaluate
+        lval *result;
+        while (lambda->count) {
+            result = lval_eval(proc_env, lval_pop(lambda, 0));
+        }
+        // Cleanup
+        lval_del(syms);
+        lval_del(v);
+        lenv_del(proc_env);
+        return result;
+    } else {
         char msg[100];
         snprintf(msg, 100, "Object of type '%s' is not applicable.",
                 TYPE_NAMES[proc->type]);
@@ -886,9 +945,6 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
         lval_del(v);
         return lval_err(msg);
     }
-    lval *result = proc->val.proc(e, v);
-    lval_del(proc);
-    return result;
 }
 
 lval *lval_eval(lenv *e, lval *v) {
