@@ -1,0 +1,4 @@
+(def {fun}
+    (\ {sig body}
+       {(def* (list (head sig))
+              (\ (tail sig) body))}))
