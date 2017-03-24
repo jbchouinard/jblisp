@@ -923,26 +923,48 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
         // Set up lambda
         lenv *lambda_env = proc->env;
         lval *syms = lval_pop(proc, 0);
-        lval *lambda = lval_take(proc, 0);
-        if (syms->count != v->count) {
+        lval *body = lval_take(proc, 0);
+
+        // Set up lambda env
+        while (syms->count && v->count) {
+            lval *k = lval_pop(syms, 0);
+            if (strcmp(k->val.sym, "&") == 0) {
+                if (syms->count != 1) {
+                    lval_del(k);
+                    lval_del(syms);
+                    lval_del(body);
+                    lval_del(v);
+                    return lval_err("Expected a single symbol after '&'.");
+                }
+                lval_del(k);
+                k = lval_pop(syms, 0);
+                v->type = LVAL_QEXPR;
+                lenv_put(lambda_env, k->val.sym, v);
+                lval_del(v);
+                v = lval_qexpr();
+                break;
+            }
+            lval *val = lval_pop(v, 0);
+            lenv_put(lambda_env, k->val.sym, val);
+            lval_del(k);
+            lval_del(val);
+        }
+        if (syms->count || v->count) {
             lval_del(syms);
-            lval_del(lambda);
+            lval_del(body);
             lval_del(v);
             return lval_err("Wrong number of arguments to lambda.");
         }
-        // Set up lambda env
-        for (int i=0; i < syms->count; i++) {
-            lenv_put(lambda_env, syms->val.cell[i]->val.sym, v->val.cell[i]);
-        }
         // Evaluate
         lval *result;
-        while (lambda->count) {
-            result = lval_eval(lambda_env, lval_pop(lambda, 0));
+        while (body->count) {
+            result = lval_eval(lambda_env, lval_pop(body, 0));
             if (result->type == LVAL_ERR) { break; }
         }
         // Cleanup
-        lval_del(syms);
         lval_del(v);
+        lval_del(syms);
+        lval_del(body);
         return result;
     } else {
         lval *err = lval_err(
