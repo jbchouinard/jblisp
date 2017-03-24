@@ -854,6 +854,9 @@ lval *builtin_lambda(lenv* e, lval *a) {
     lval* v = lval_lambda();
     lval_add(v, syms);
     lval_add(v, q);
+    lenv *lambda_env = lenv_new();
+    lambda_env->encl = e;
+    v->env = lambda_env;
     return v;
 }
 
@@ -1012,7 +1015,7 @@ void build_parser() {
 
     mpca_lang(MPCA_LANG_DEFAULT,
         "                                                                     \
-            boolean  : /(#t)|(#f)/ ;                                     \
+            boolean  : /(#t)|(#f)/ ;                                          \
             number   : /((-?[0-9]*[.][0-9]+)|(-?[0-9]+[.]?))([eE]-?[0-9]+)?/ ;\
             symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&?\\^]+/ ;                 \
             sexpr    : '(' <expr>* ')' ;                                      \
