@@ -63,6 +63,7 @@ lval *builtin_or(lenv*, lval*);
 lval *builtin_not(lenv*, lval*);
 
 lval *builtin_def(lenv*, lval*);
+lval *builtin_def_global(lenv*, lval*);
 lval *builtin_lambda(lenv*, lval*);
 lval *builtin_equal(lenv*, lval*);
 lval *builtin_is(lenv*, lval*);

@@ -835,6 +835,14 @@ lval *builtin_def(lenv* e, lval *a) {
     return a;
 }
 
+lval *builtin_def_global(lenv *e, lval *a) {
+    lenv *global = e;
+    while(global->encl != NULL) {
+        global = global->encl;
+    }
+    return builtin_def(global, a);
+}
+
 lval *builtin_lambda(lenv* e, lval *a) {
     LASSERT_ARGC("lambda", a, 2);
     LASSERT_ARGT("lambda", a, 0, LVAL_QEXPR);
@@ -863,6 +871,7 @@ lval *builtin_lambda(lenv* e, lval *a) {
 
 void add_builtins(lenv *e) {
     lenv_put(e, "def", lval_proc(builtin_def));
+    lenv_put(e, "def*", lval_proc(builtin_def_global));
     lenv_put(e, "equal?", lval_proc(builtin_equal));
     lenv_put(e, "is?", lval_proc(builtin_is));
     lenv_put(e, "\\", lval_proc(builtin_lambda));
