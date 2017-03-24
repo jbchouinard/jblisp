@@ -3,7 +3,7 @@
 
 #include "mpc.h"
 
-#define VERSION "0.4.3"
+#define VERSION "0.4.4"
 
 extern mpc_parser_t *Boolean;
 extern mpc_parser_t *Number;
@@ -15,6 +15,7 @@ extern mpc_parser_t *JBLisp;
 
 typedef struct _lval lval;
 typedef struct _lenv lenv;
+typedef struct _lproc lproc;
 typedef lval *(*lbuiltin)(lenv*, lval*);
 
 lenv *lenv_new(lenv*);
@@ -23,6 +24,10 @@ lval *lenv_pop(lenv*, char*);
 void lenv_del(lenv*);
 void lenv_put(lenv*, char*, lval*);
 
+lproc *lproc_new(void);
+lproc *lproc_copy(lproc*);
+void lproc_del(lproc*);
+
 lval *lval_bool(int);
 lval *lval_dbl(double);
 lval *lval_lng(long);
@@ -30,7 +35,8 @@ lval *lval_err(char*, ...);
 lval *lval_sexpr(void);
 lval *lval_qexpr(void);
 lval *lval_sym(char*);
-lval *lval_proc(lbuiltin);
+lval *lval_builtin(lbuiltin);
+lval *lval_proc(void);
 
 lval *lval_add(lval*, lval*);
 lval *lval_pop(lval*, int);
@@ -84,8 +90,10 @@ lval *builtin_nth(lenv*, lval*);
 
 lval *lval_read(mpc_ast_t*);
 lval *lval_read_num(mpc_ast_t*);
+
 lval *lval_eval(lenv*, lval*);
 lval *lval_eval_sexpr(lenv*, lval*);
+lval *lval_call(lenv*, lproc*, lval*);
 
 void exec_line(lenv*, char*);
 void exec_file(lenv*, char*);

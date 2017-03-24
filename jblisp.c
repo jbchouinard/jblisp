@@ -26,13 +26,6 @@
         return err;                                                        \
     }
 
-#define BAIL_IF_ERR(args)                          \
-    for (int i=0; i < args->count; i++) {          \
-        if (args->val.cell[i]->type == LVAL_ERR) { \
-            return lval_take(args, i);             \
-        }                                          \
-    }
-
 // Parser def'n
 mpc_parser_t *Boolean;
 mpc_parser_t *Number;
@@ -44,17 +37,16 @@ mpc_parser_t *JBLisp;
 
 // JBLisp builtin types
 enum { LVAL_BOOL, LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM,
-       LVAL_BUILTIN, LVAL_LAMBDA, LVAL_SEXPR, LVAL_QEXPR };
+       LVAL_BUILTIN, LVAL_PROC, LVAL_SEXPR, LVAL_QEXPR };
 char* TYPE_NAMES[] = {
     "boolean", "integer", "float", "error", "symbol",
-    "builtin procedure", "lambda procedure", "S-expression", "Q-expression"
+    "builtin", "procedure", "S-expression", "Q-expression"
 };
 
 struct _lval {
     int type;
     int count;
     int size;
-    lenv *env;
     union {
         enum {LFALSE=0, LTRUE=!LFALSE} bool;
         double dbl;
@@ -62,8 +54,15 @@ struct _lval {
         char *err;
         char *sym;
         lval **cell;
-        lbuiltin proc;
+        lbuiltin builtin;
+        lproc *proc;
     } val;
+};
+
+struct _lproc {
+    lval *params;
+    lval *body;
+    lenv *env;
 };
 
 struct _lenv {
@@ -73,6 +72,32 @@ struct _lenv {
     char **syms;
     lval **vals;
 };
+
+lproc *lproc_new() {
+    lproc *p = malloc(sizeof(lproc));
+    p->params = NULL;
+    p->body = NULL;
+    p->env = NULL;
+    return p;
+}
+
+lproc *lproc_copy(lproc *p) {
+    lproc *v = malloc(sizeof(lproc));
+    v->env = p->env;
+    v->params = lval_copy(p->params);
+    v->body = lval_copy(p->body);
+    return v;
+}
+
+void lproc_del(lproc *p) {
+    if (p->params != NULL) {
+        lval_del(p->params);
+    }
+    if (p->body != NULL) {
+        lval_del(p->body);
+    }
+    free(p);
+}
 
 lenv *lenv_new(lenv *enc) {
     lenv *e = malloc(sizeof(lenv));
@@ -128,11 +153,10 @@ lval *lenv_get(lenv *e, char *sym) {
 
 lval *lval_new() {
     lval *v = malloc(sizeof(lval));
-    v->type = LVAL_ERR;
-    v->val.err = NULL;
-    v->env = NULL;
     v->count = 0;
     v->size = 0;
+    v->type = 0;
+    v->val.cell = NULL;
     return v;
 }
 
@@ -193,17 +217,17 @@ lval *lval_sym(char *s) {
     return v;
 }
 
-lval *lval_proc(lbuiltin proc) {
+lval *lval_builtin(lbuiltin bltn) {
     lval *v = lval_new();
     v->type = LVAL_BUILTIN;
-    v->val.proc = proc;
+    v->val.builtin = bltn;
     return v;
 }
 
-lval *lval_lambda(void) {
+lval *lval_proc(void) {
     lval *v = lval_new();
-    v->type = LVAL_LAMBDA;
-    v->val.cell = NULL;
+    v->type = LVAL_PROC;
+    v->val.proc = lproc_new();
     return v;
 }
 
@@ -241,7 +265,7 @@ int lval_equal(lval *v, lval *w) {
             break;
         case LVAL_SEXPR:
         case LVAL_QEXPR:
-        case LVAL_LAMBDA:
+        case LVAL_PROC:
             if (v->count == w->count) {
                 eq = 1;
                 for (int i=0; i < v->count; i++) {
@@ -282,9 +306,11 @@ void lval_del(lval *v) {
         case LVAL_SYM:
             free(v->val.sym);
             break;
+        case LVAL_PROC:
+            lproc_del(v->val.proc);
+            break;
         case LVAL_SEXPR:
         case LVAL_QEXPR:
-        case LVAL_LAMBDA:
             for (int i=0; i < v->count; i++)
                 lval_del(v->val.cell[i]);
             free(v->val.cell);
@@ -298,7 +324,6 @@ lval *lval_copy(lval *v) {
     x->type = v->type;
     x->size = v->size;
     x->count = v->count;
-    x->env = v->env;
 
     switch (v->type) {
         case LVAL_BOOL:
@@ -319,11 +344,13 @@ lval *lval_copy(lval *v) {
             strcpy(x->val.sym, v->val.sym);
             break;
         case LVAL_BUILTIN:
-            x->val.proc = v->val.proc;
+            x->val.builtin = v->val.builtin;
+            break;
+        case LVAL_PROC:
+            x->val.proc = lproc_copy(v->val.proc);
             break;
         case LVAL_SEXPR:
         case LVAL_QEXPR:
-        case LVAL_LAMBDA:
             x->val.cell = malloc(sizeof(lval*) * x->count);
             for (int i=0; i < v->count; i++) {
                 x->val.cell[i] = lval_copy(v->val.cell[i]);
@@ -453,7 +480,7 @@ void lval_print(lval *v) {
         case LVAL_BUILTIN:
             printf("<builtin procedure at %p>", (void*) v->val.proc);
             break;
-        case LVAL_LAMBDA:
+        case LVAL_PROC:
             printf("<lambda procedure>");
             break;
         case LVAL_ERR:
@@ -628,7 +655,7 @@ lval* builtin_eq(lenv *e, lval *a) {
     LASSERT_ARGC("=", a, 2);
     lval *x = lval_pop(a, 0);
     lval *y = lval_take(a, 0);
-    x = lval_arith(x, y, LT);
+    x = lval_arith(x, y, EQ);
     if (x->type == LVAL_ERR) { return x; };
     x->type = LVAL_BOOL;
     x->val.bool = lval_is_true(x);
@@ -760,7 +787,7 @@ lval *builtin_equal(lenv* e, lval *a) {
 
     int eq = lval_equal(a->val.cell[0], a->val.cell[1]);
     lval_del(a);
-    return lval_lng((long) eq);
+    return lval_bool(eq);
 }
 
 lval *builtin_is(lenv* e, lval *a) {
@@ -862,10 +889,10 @@ lval *builtin_lambda(lenv *e, lval *a) {
         return lval_err("Invalid lambda expression - empty procedure body");
     }
 
-    lval* v = lval_lambda();
-    lval_add(v, syms);
-    lval_add(v, q);
-    v->env = lenv_new(e);
+    lval* v = lval_proc();
+    v->val.proc->env = lenv_new(e);
+    v->val.proc->params = syms;
+    v->val.proc->body = q;
     return v;
 }
 
@@ -907,117 +934,44 @@ lval *builtin_assert(lenv *e, lval *a) {
 }
 
 void add_builtins(lenv *e) {
-    lenv_put(e, "def", lval_proc(builtin_def));
-    lenv_put(e, "def*", lval_proc(builtin_def_global));
-    lenv_put(e, "equal?", lval_proc(builtin_equal));
-    lenv_put(e, "is?", lval_proc(builtin_is));
-    lenv_put(e, "\\", lval_proc(builtin_lambda));
-    lenv_put(e, "apply", lval_proc(builtin_apply));
-    lenv_put(e, "error", lval_proc(builtin_error));
-    lenv_put(e, "assert", lval_proc(builtin_assert));
+    lenv_put(e, "def", lval_builtin(builtin_def));
+    lenv_put(e, "def*", lval_builtin(builtin_def_global));
+    lenv_put(e, "equal?", lval_builtin(builtin_equal));
+    lenv_put(e, "is?", lval_builtin(builtin_is));
+    lenv_put(e, "\\", lval_builtin(builtin_lambda));
+    lenv_put(e, "apply", lval_builtin(builtin_apply));
+    lenv_put(e, "error", lval_builtin(builtin_error));
+    lenv_put(e, "assert", lval_builtin(builtin_assert));
 
     // List procedures
-    lenv_put(e, "list", lval_proc(builtin_list));
-    lenv_put(e, "eval", lval_proc(builtin_eval));
-    lenv_put(e, "join", lval_proc(builtin_join));
-    lenv_put(e, "cons", lval_proc(builtin_cons));
-    lenv_put(e, "len", lval_proc(builtin_len));
-    lenv_put(e, "head", lval_proc(builtin_head));
-    lenv_put(e, "tail", lval_proc(builtin_tail));
-    lenv_put(e, "init", lval_proc(builtin_init));
-    lenv_put(e, "last", lval_proc(builtin_last));
-    lenv_put(e, "nth", lval_proc(builtin_nth));
+    lenv_put(e, "list", lval_builtin(builtin_list));
+    lenv_put(e, "eval", lval_builtin(builtin_eval));
+    lenv_put(e, "join", lval_builtin(builtin_join));
+    lenv_put(e, "cons", lval_builtin(builtin_cons));
+    lenv_put(e, "len", lval_builtin(builtin_len));
+    lenv_put(e, "head", lval_builtin(builtin_head));
+    lenv_put(e, "tail", lval_builtin(builtin_tail));
+    lenv_put(e, "init", lval_builtin(builtin_init));
+    lenv_put(e, "last", lval_builtin(builtin_last));
+    lenv_put(e, "nth", lval_builtin(builtin_nth));
 
     // Arithmetic
-    lenv_put(e, "+", lval_proc(builtin_add));
-    lenv_put(e, "-", lval_proc(builtin_sub));
-    lenv_put(e, "*", lval_proc(builtin_mul));
-    lenv_put(e, "/", lval_proc(builtin_div));
-    lenv_put(e, "%", lval_proc(builtin_mod));
-    lenv_put(e, "^", lval_proc(builtin_exp));
-    lenv_put(e, "<", lval_proc(builtin_lt));
-    lenv_put(e, "=", lval_proc(builtin_eq));
+    lenv_put(e, "+", lval_builtin(builtin_add));
+    lenv_put(e, "-", lval_builtin(builtin_sub));
+    lenv_put(e, "*", lval_builtin(builtin_mul));
+    lenv_put(e, "/", lval_builtin(builtin_div));
+    lenv_put(e, "%", lval_builtin(builtin_mod));
+    lenv_put(e, "^", lval_builtin(builtin_exp));
+    lenv_put(e, "<", lval_builtin(builtin_lt));
+    lenv_put(e, "=", lval_builtin(builtin_eq));
 
     // Logic functions
-    lenv_put(e, "and", lval_proc(builtin_and));
-    lenv_put(e, "or", lval_proc(builtin_or));
-    lenv_put(e, "not", lval_proc(builtin_not));
-}
-
-lval *lval_eval_sexpr(lenv *e, lval *v) {
-    if (v->count == 0) {
-        return v;
-    }
-    for (int i=0; i < v->count; i++) {
-        v->val.cell[i] = lval_eval(e, v->val.cell[i]);
-    }
-    BAIL_IF_ERR(v);
-
-    lval *proc = lval_pop(v, 0);
-
-    if (proc->type == LVAL_BUILTIN) {
-        lval *result = proc->val.proc(e, v);
-        lval_del(proc);
-        return result;
-    } else if (proc->type == LVAL_LAMBDA) {
-        // Set up lambda
-        lenv *lambda_env = proc->env;
-        lval *syms = lval_pop(proc, 0);
-        lval *body = lval_take(proc, 0);
-
-        // Set up lambda env
-        while (syms->count && v->count) {
-            lval *k = lval_pop(syms, 0);
-            if (strcmp(k->val.sym, "&") == 0) {
-                if (syms->count != 1) {
-                    lval_del(k);
-                    lval_del(syms);
-                    lval_del(body);
-                    lval_del(v);
-                    return lval_err("Expected a single symbol after '&'.");
-                }
-                lval_del(k);
-                k = lval_pop(syms, 0);
-                v->type = LVAL_QEXPR;
-                lenv_put(lambda_env, k->val.sym, v);
-                lval_del(v);
-                v = lval_qexpr();
-                break;
-            }
-            lval *val = lval_pop(v, 0);
-            lenv_put(lambda_env, k->val.sym, val);
-            lval_del(k);
-            lval_del(val);
-        }
-        if (syms->count || v->count) {
-            lval_del(syms);
-            lval_del(body);
-            lval_del(v);
-            return lval_err("Wrong number of arguments to lambda.");
-        }
-        // Evaluate
-        lval *result;
-        while (body->count) {
-            result = lval_eval(lambda_env, lval_pop(body, 0));
-            if (result->type == LVAL_ERR) { break; }
-        }
-        // Cleanup
-        lval_del(v);
-        lval_del(syms);
-        lval_del(body);
-        return result;
-    } else {
-        lval *err = lval_err(
-            "Object of type '%s' is not applicable.", TYPE_NAMES[proc->type]);
-        lval_del(proc);
-        lval_del(v);
-        return err;
-    }
+    lenv_put(e, "and", lval_builtin(builtin_and));
+    lenv_put(e, "or", lval_builtin(builtin_or));
+    lenv_put(e, "not", lval_builtin(builtin_not));
 }
 
 lval *lval_eval(lenv *e, lval *v) {
-    BAIL_IF_ERR(v);
-
     lval *x;
     switch (v->type) {
         case LVAL_SYM:
@@ -1032,6 +986,86 @@ lval *lval_eval(lenv *e, lval *v) {
             break;
     }
     return x;
+}
+
+lval *lval_eval_sexpr(lenv *e, lval *v) {
+    // Special case: empty sexpr evaluates to itself
+    if (v->count == 0) { return v; }
+
+    // We expect the first element of the sexpr to be a procedure, either
+    // builtin or user-defined / lambda.
+    lval *procval = lval_eval(e, lval_pop(v, 0));
+
+    lenv *env;
+    if (procval->type == LVAL_PROC) {
+        env = procval->val.proc->env;
+    } else {
+        env = e;
+    }
+    // Evaluate arguments.
+    for (int i=0; i < v->count; i++) {
+        v->val.cell[i] = lval_eval(env, v->val.cell[i]);
+        // Bail out if there is an error
+        if (v->val.cell[i]->type == LVAL_ERR) {
+            lval_del(procval);
+            return lval_take(v, i);
+        }
+    }
+    lval *result;
+    if (procval->type == LVAL_BUILTIN) {
+        result = procval->val.builtin(env, v);
+    } else if (procval->type == LVAL_PROC) {
+        result = lval_call(env, lproc_copy(procval->val.proc), v);
+    } else {
+        result = lval_err(
+            "Object of type '%s' is not applicable.",
+            TYPE_NAMES[procval->type]);
+        lval_del(v);
+    }
+    lval_del(procval);
+    return result;
+}
+
+lval *lval_call(lenv *e, lproc *p, lval *args) {
+    // Set up procedure's env
+    while (p->params->count && args->count) {
+        lval *par = lval_pop(p->params, 0);
+        lval *arg;
+        // Special syntax for arg list like {x & xs}
+        // All remaining args go in a qexpr in xs
+        if (strcmp(par->val.sym, "&") == 0) {
+            lval_del(par);
+            if (p->params->count != 1) {
+                lproc_del(p);
+                lval_del(args);
+                return lval_err("Expected a single symbol after '&'.");
+            }
+            par = lval_pop(p->params, 0);
+            arg = args;
+            arg->type = LVAL_QEXPR;
+            args = lval_qexpr();
+        } else {
+            arg = lval_pop(args, 0);
+        }
+        lenv_put(p->env, par->val.sym, arg);
+        lval_del(par);
+        lval_del(arg);
+    }
+    if (p->params->count || args->count) {
+        lproc_del(p);
+        lval_del(args);
+        return lval_err("Wrong number of arguments to lambda.");
+    }
+    // Evaluate
+    lval *result;
+    while (p->body->count) {
+        result = lval_eval(p->env, lval_pop(p->body, 0));
+        if (result->type == LVAL_ERR) { break; }
+    }
+    // Cleanup
+    lproc_del(p);
+    lval_del(args);
+    return result;
 }
 
 void exec_file(lenv *e, char *filename) {
