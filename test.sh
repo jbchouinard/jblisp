@@ -5,4 +5,4 @@ echo ""
 echo ""
 echo "RUNNING LISP TESTS..."
 echo ""
-./build/jblisp tests/test.jblisp
+./build/jblisp tests/test.jbl
