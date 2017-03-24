@@ -295,6 +295,9 @@ void lval_del(lval *v) {
 lval *lval_copy(lval *v) {
     lval *x = malloc(sizeof(lval));
     x->type = v->type;
+    x->size = v->size;
+    x->count = v->count;
+    x->env = v->env;
 
     switch (v->type) {
         case LVAL_BOOL:
@@ -320,7 +323,6 @@ lval *lval_copy(lval *v) {
         case LVAL_SEXPR:
         case LVAL_QEXPR:
         case LVAL_LAMBDA:
-            x->count = v->count;
             x->val.cell = malloc(sizeof(lval*) * x->count);
             for (int i=0; i < v->count; i++) {
                 x->val.cell[i] = lval_copy(v->val.cell[i]);
@@ -854,9 +856,8 @@ lval *builtin_lambda(lenv* e, lval *a) {
     lval* v = lval_lambda();
     lval_add(v, syms);
     lval_add(v, q);
-    lenv *lambda_env = lenv_new();
-    lambda_env->encl = e;
-    v->env = lambda_env;
+    v->env = lenv_new();
+    v->env->encl = e;
     return v;
 }
 
@@ -911,6 +912,9 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
         return result;
     } else if (proc->type == LVAL_LAMBDA) {
         // Set up lambda
+        lenv *lambda_env = proc->env;
+        lenv_put(lambda_env, "test", lval_dbl(5.0));
+        lenv_get(lambda_env, "test");
         lval *syms = lval_pop(proc, 0);
         lval *lambda = lval_take(proc, 0);
         if (syms->count != v->count) {
@@ -920,21 +924,18 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
             return lval_err("Wrong number of arguments to lambda.");
         }
         // Set up lambda env
-        lenv *proc_env = lenv_new();
-        proc_env->encl = e;
         for (int i=0; i < syms->count; i++) {
-            lenv_put(proc_env, syms->val.cell[i]->val.sym, v->val.cell[i]);
+            lenv_put(lambda_env, syms->val.cell[i]->val.sym, v->val.cell[i]);
         }
         // Evaluate
         lval *result;
         while (lambda->count) {
-            result = lval_eval(proc_env, lval_pop(lambda, 0));
+            result = lval_eval(lambda_env, lval_pop(lambda, 0));
             if (result->type == LVAL_ERR) { break; }
         }
         // Cleanup
         lval_del(syms);
         lval_del(v);
-        lenv_del(proc_env);
         return result;
     } else {
         lval *err = lval_err(
