@@ -3,7 +3,7 @@
 
 #include "mpc.h"
 
-#define VERSION "0.4.4"
+#define VERSION "0.5.0"
 
 extern mpc_parser_t *Boolean;
 extern mpc_parser_t *Number;

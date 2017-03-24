@@ -645,10 +645,21 @@ lval* builtin_lt(lenv *e, lval *a) {
     lval *x = lval_pop(a, 0);
     lval *y = lval_take(a, 0);
     x = lval_arith(x, y, LT);
-    if (x->type == LVAL_ERR) { return x; };
-    x->type = LVAL_BOOL;
-    x->val.bool = lval_is_true(x);
-    return x;
+    lval *res;
+    switch (x->type) {
+        case LVAL_ERR:
+            res = x;
+            break;
+        case LVAL_LNG:
+            res = lval_bool(x->val.lng);
+            lval_del(x);
+            break;
+        case LVAL_DBL:
+            res = lval_bool((long) x->val.dbl);
+            lval_del(x);
+            break;
+    }
+    return res;
 }
 
 lval* builtin_eq(lenv *e, lval *a) {
@@ -656,10 +667,21 @@ lval* builtin_eq(lenv *e, lval *a) {
     lval *x = lval_pop(a, 0);
     lval *y = lval_take(a, 0);
     x = lval_arith(x, y, EQ);
-    if (x->type == LVAL_ERR) { return x; };
-    x->type = LVAL_BOOL;
-    x->val.bool = lval_is_true(x);
-    return x;
+    lval *res;
+    switch (x->type) {
+        case LVAL_ERR:
+            res = x;
+            break;
+        case LVAL_LNG:
+            res = lval_bool(x->val.lng);
+            lval_del(x);
+            break;
+        case LVAL_DBL:
+            res = lval_bool((long) x->val.dbl);
+            lval_del(x);
+            break;
+    }
+    return res;
 }
 
 lval *builtin_nth(lenv *e, lval *a) {
