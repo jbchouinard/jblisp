@@ -4,14 +4,6 @@
 #include "mpc.h"
 #include "jblisp.h"
 
-mpc_parser_t *Boolean;
-mpc_parser_t *Number;
-mpc_parser_t *Symbol;
-mpc_parser_t *Sexpr;
-mpc_parser_t *Qexpr;
-mpc_parser_t *Expr;
-mpc_parser_t *JBLisp;
-
 #define LASSERT(args, cond, err) \
     if (!(cond)) { lval_del(args); return lval_err(err); }
 
@@ -41,7 +33,16 @@ mpc_parser_t *JBLisp;
         }                                          \
     }
 
-// Lisp types
+// Parser def'n
+mpc_parser_t *Boolean;
+mpc_parser_t *Number;
+mpc_parser_t *Symbol;
+mpc_parser_t *Sexpr;
+mpc_parser_t *Qexpr;
+mpc_parser_t *Expr;
+mpc_parser_t *JBLisp;
+
+// JBLisp builtin types
 enum { LVAL_BOOL, LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM,
        LVAL_BUILTIN, LVAL_LAMBDA, LVAL_SEXPR, LVAL_QEXPR };
 char* TYPE_NAMES[] = {
@@ -913,8 +914,6 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
     } else if (proc->type == LVAL_LAMBDA) {
         // Set up lambda
         lenv *lambda_env = proc->env;
-        lenv_put(lambda_env, "test", lval_dbl(5.0));
-        lenv_get(lambda_env, "test");
         lval *syms = lval_pop(proc, 0);
         lval *lambda = lval_take(proc, 0);
         if (syms->count != v->count) {
@@ -1027,4 +1026,3 @@ void build_parser() {
         Boolean, Number, Symbol, Sexpr, Qexpr, Expr, JBLisp
     );
 }
-
