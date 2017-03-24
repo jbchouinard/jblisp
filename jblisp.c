@@ -497,9 +497,10 @@ void lval_println(lval *v) {
     putchar('\n');
 }
 
-void lval_lng_to_dbl(lval *v) {
+lval *lval_lng_to_dbl(lval *v) {
     v->type = LVAL_DBL;
     v->val.dbl = (double) v->val.lng;
+    return v;
 }
 
 enum {ADD, SUB, MUL, DIV, MOD, EXP, LT, EQ};
@@ -509,10 +510,10 @@ lval* lval_arith(lval *x, lval *y, int op) {
     if (x->type == y->type) {
         type = x->type;
     } else if (x->type == LVAL_LNG) {
-        lval_lng_to_dbl(x);
+        x = lval_lng_to_dbl(x);
     } else if (y->type == LVAL_LNG) {
         type = x->type;
-        lval_lng_to_dbl(y);
+        y = lval_lng_to_dbl(y);
     }
     if (type != LVAL_LNG && type != LVAL_DBL) {
         lval_del(x);

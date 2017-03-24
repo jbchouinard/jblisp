@@ -53,7 +53,7 @@ void lval_println(lval*);
 void lval_print_expr(lval*, char, char);
 
 lval *lval_arith(lval*, lval*, int);
-lval *lval_to_dbl(lval*);
+lval *lval_lng_to_dbl(lval*);
 
 lval *builtin_add(lenv*, lval*);
 lval *builtin_sub(lenv*, lval*);
