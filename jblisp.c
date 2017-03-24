@@ -843,7 +843,7 @@ lval *builtin_def_global(lenv *e, lval *a) {
     return builtin_def(global, a);
 }
 
-lval *builtin_lambda(lenv* e, lval *a) {
+lval *builtin_lambda(lenv *e, lval *a) {
     LASSERT_ARGC("lambda", a, 2);
     LASSERT_ARGT("lambda", a, 0, LVAL_QEXPR);
     LASSERT_ARGT("lambda", a, 1, LVAL_QEXPR);
@@ -869,12 +869,28 @@ lval *builtin_lambda(lenv* e, lval *a) {
     return v;
 }
 
+lval *builtin_apply(lenv *e, lval *a) {
+    LASSERT_ARGC("apply", a, 2);
+    lval *proc = lval_pop(a, 0);
+    a = lval_take(a, 0);
+    if (a->type != LVAL_QEXPR) {
+        lval_del(proc);
+        lval_del(a);
+        return lval_err(
+            "Builtin 'apply' expected argument 2 of type 'q-expression'");
+    }
+    lval_insert(a, proc, 0);
+    a->type = LVAL_SEXPR;
+    return lval_eval(e, a);
+}
+
 void add_builtins(lenv *e) {
     lenv_put(e, "def", lval_proc(builtin_def));
     lenv_put(e, "def*", lval_proc(builtin_def_global));
     lenv_put(e, "equal?", lval_proc(builtin_equal));
     lenv_put(e, "is?", lval_proc(builtin_is));
     lenv_put(e, "\\", lval_proc(builtin_lambda));
+    lenv_put(e, "apply", lval_proc(builtin_apply));
 
     // List procedures
     lenv_put(e, "list", lval_proc(builtin_list));
