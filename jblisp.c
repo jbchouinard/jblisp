@@ -474,188 +474,169 @@ void lval_println(lval *v) {
     putchar('\n');
 }
 
-lval *lval_to_dbl(lval *v) {
-    switch (v->type) {
-        case LVAL_BOOL:
-            v->type = LVAL_DBL;
-            v->val.dbl = v->val.bool ? 1.0 : 0.0;
-            break;
-        case LVAL_DBL:
-            break;
-        case LVAL_LNG:
-            v->type = LVAL_DBL;
-            v->val.dbl = (double) v->val.lng;
-            break;
-        default:
-            lval_del(v);
-            v = lval_err(
-                "Type error: '%s' cannot be converted to number.",
-                TYPE_NAMES[v->type]);
-            break;
-    }
-    return v;
+void lval_lng_to_dbl(lval *v) {
+    v->type = LVAL_DBL;
+    v->val.dbl = (double) v->val.lng;
 }
 
-lval *builtin_arith_dbl(lval *x, lval *y, char *op) {
-    if (strcmp(op, "+") == 0) x->val.dbl += y->val.dbl;
-    else if (strcmp(op, "-") == 0) x->val.dbl -= y->val.dbl;
-    else if (strcmp(op, "*") == 0) x->val.dbl *= y->val.dbl;
-    else if (strcmp(op, "/") == 0) x->val.dbl /= y->val.dbl;
-    else if (strcmp(op, "^") == 0) x->val.dbl = pow(y->val.dbl, x->val.dbl);
-    else if (strcmp(op, "min") == 0) {
-        if (x->val.dbl > y->val.dbl) x->val.dbl = y->val.dbl;
+enum {ADD, SUB, MUL, DIV, MOD, EXP, LT, EQ};
+
+lval* lval_arith(lval *x, lval *y, int op) {
+    int type = y->type;
+    if (x->type == y->type) {
+        type = x->type;
+    } else if (x->type == LVAL_LNG) {
+        lval_lng_to_dbl(x);
+    } else if (y->type == LVAL_LNG) {
+        type = x->type;
+        lval_lng_to_dbl(y);
     }
-    else if (strcmp(op, "max") == 0) {
-        if (x->val.dbl < y->val.dbl) x->val.dbl = y->val.dbl;
-    }
-    else {
+    if (type != LVAL_LNG && type != LVAL_DBL) {
         lval_del(x);
-        x = lval_err(
-            "Bad operator '%s' for type '%s'",
-            op, TYPE_NAMES[LVAL_DBL]);
+        lval_del(y);
+        return lval_err("Type '%s' cannot be converted to number.",
+                        TYPE_NAMES[type]);
     }
-    lval_del(y);
-    return x;
-}
-
-lval *builtin_arith_lng(lval *x, lval *y, char *op) {
-    if (strcmp(op, "+") == 0) x->val.lng += y->val.lng;
-    else if (strcmp(op, "-") == 0) x->val.lng -= y->val.lng;
-    else if (strcmp(op, "*") == 0) x->val.lng *= y->val.lng;
-    else if (strcmp(op, "/") == 0) x->val.lng /= y->val.lng;
-    else if (strcmp(op, "^") == 0) x->val.lng = pow(y->val.lng, x->val.lng);
-    else if (strcmp(op, "min") == 0) {
-        if (x->val.lng > y->val.lng) x->val.lng = y->val.lng;
-    }
-    else if (strcmp(op, "max") == 0) {
-        if (x->val.lng < y->val.lng) x->val.lng = y->val.lng;
-    }
-    else if (strcmp(op, "%") == 0) x->val.lng %= y->val.lng;
-    else {
-        lval_del(x);
-        x = lval_err(
-            "Bad operator '%s' for type '%s'",
-            op, TYPE_NAMES[LVAL_LNG]);
-    }
-    lval_del(y);
-    return x;
-}
-
-// Operator associativity types
-enum { ASSOC_RIGHT, ASSOC_LEFT };
-
-lval *builtin_arith(lval *a, char *op) {
-    if (a->count == 0) {
-        if (strcmp(op, "+") == 0) {
-            lval_del(a);
-            return lval_lng(0);
-        } else if (strcmp(op, "*") == 0) {
-            lval_del(a);
-            return lval_lng(1);
-        } else {
-            lval_del(a);
-            return lval_err("Builtin op '%s' takes at least 1 argument.", op);
-        }
-    }
-
-    // If any operand is a double, cast all to double
-    int type = LVAL_LNG;
-    for (int i=0; i < a->count; i++) {
-        if (a->val.cell[i]->type == LVAL_DBL)
-            type = LVAL_DBL;
-        else if (a->val.cell[i]->type != LVAL_LNG) {
-            lval *err = lval_err(
-                "Builtin op '%s' not applicable on type '%s'.",
-                op, TYPE_NAMES[a->val.cell[i]->type]);
-            lval_del(a);
-            return err;
-        }
-    }
-    if (type == LVAL_DBL) {
-        for (int i=0; i < a->count; i++) {
-            a->val.cell[i] = lval_to_dbl(a->val.cell[i]);
-        }
-    }
-
-    // Set associativity rule
-    int assoc;
-    if (strcmp(op, "^") == 0) assoc = ASSOC_RIGHT;
-    else                      assoc = ASSOC_LEFT;
-
-    lval *x;
-    if (assoc == ASSOC_LEFT) x = lval_pop(a, 0);
-    else                     x = lval_pop(a, a->count-1);
-
-    // (- x) = -x
-    if ((strcmp(op, "-") == 0) && a->count == 0) {
-        if (type == LVAL_DBL) {
-            lval_del(a);
-            return builtin_arith_dbl(lval_dbl(0.0), x, op);
-        } else {
-            lval_del(a);
-            return builtin_arith_lng(lval_lng(0), x , op);
-        }
-    }
-    // (/ x) = 1 / x
-    if ((strcmp(op, "/") == 0) && a->count == 0) {
-        if (type == LVAL_DBL) {
-            lval_del(a);
-            return builtin_arith_dbl(lval_dbl(1.0), x, op);
-        } else {
-            lval_del(a);
-            return builtin_arith_lng(lval_lng(1), x , op);
-        }
-    }
-
-    while (a->count) {
-        lval *y;
-        if (assoc == ASSOC_LEFT) y = lval_pop(a, 0);
-        else                     y = lval_pop(a, a->count-1);
-
-        switch (type) {
-            case LVAL_DBL:
-                x = builtin_arith_dbl(x, y, op);
+    if (type == LVAL_LNG) {
+        switch(op) {
+            case ADD:
+                x->val.lng = x->val.lng + y->val.lng;
                 break;
-            case LVAL_LNG:
-                x = builtin_arith_lng(x, y, op);
+            case SUB:
+                x->val.lng = x->val.lng - y->val.lng;
+                break;
+            case MUL:
+                x->val.lng = x->val.lng * y->val.lng;
+                break;
+            case DIV:
+                if (y->val.lng == 0) {
+                    lval_del(x);
+                    x = lval_err("Division by zero undefined");
+                    break;
+                }
+                x->val.lng = x->val.lng / y->val.lng;
+                break;
+            case MOD:
+                x->val.lng = x->val.lng % y->val.lng;
+                break;
+            case EXP:
+                x->val.lng = pow(x->val.lng, y->val.lng);
+                break;
+            case LT:
+                x->val.lng = x->val.lng < y->val.lng;
+                break;
+            case EQ:
+                x->val.lng = x->val.lng == y->val.lng;
+                break;
+            default:
+                lval_del(x);
+                x = lval_err("Undefined arithmetic operation.");
                 break;
         }
-        if (x->type == LVAL_ERR) break;
+    } else {
+        switch(op) {
+            case ADD:
+                x->val.dbl = x->val.dbl + y->val.dbl;
+                break;
+            case SUB:
+                x->val.dbl = x->val.dbl - y->val.dbl;
+                break;
+            case MUL:
+                x->val.dbl = x->val.dbl * y->val.dbl;
+                break;
+            case DIV:
+                if (y->val.dbl == 0) {
+                    lval_del(x);
+                    x = lval_err("Division by zero undefined");
+                    break;
+                }
+                x->val.dbl = x->val.dbl / y->val.dbl;
+                break;
+            case MOD:
+                lval_del(x);
+                x = lval_err("Modulo not defined on float numbers.");
+                break;
+            case EXP:
+                x->val.dbl = pow(x->val.dbl, y->val.dbl);
+                break;
+            case LT:
+                x->val.dbl = x->val.dbl < y->val.dbl;
+                break;
+            case EQ:
+                x->val.dbl = x->val.dbl == y->val.dbl;
+                break;
+            default:
+                lval_del(x);
+                x = lval_err("Undefined arithmetic operation.");
+                break;
+        }
     }
-    lval_del(a);
+    lval_del(y);
     return x;
 }
 
 lval* builtin_add(lenv *e, lval *a) {
-    return builtin_arith(a, "+");
+    LASSERT_ARGC("+", a, 2);
+    lval *x = lval_pop(a, 0);
+    lval *y = lval_take(a, 0);
+    return lval_arith(x, y, ADD);
 }
 
 lval* builtin_sub(lenv *e, lval *a) {
-    return builtin_arith(a, "-");
+    LASSERT_ARGC("-", a, 2);
+    lval *x = lval_pop(a, 0);
+    lval *y = lval_take(a, 0);
+    return lval_arith(x, y, SUB);
 }
 
 lval* builtin_mul(lenv *e, lval *a) {
-    return builtin_arith(a, "*");
+    LASSERT_ARGC("*", a, 2);
+    lval *x = lval_pop(a, 0);
+    lval *y = lval_take(a, 0);
+    return lval_arith(x, y, MUL);
 }
 
 lval* builtin_div(lenv *e, lval *a) {
-    return builtin_arith(a, "/");
+    LASSERT_ARGC("/", a, 2);
+    lval *x = lval_pop(a, 0);
+    lval *y = lval_take(a, 0);
+    return lval_arith(x, y, DIV);
 }
 
 lval* builtin_mod(lenv *e, lval *a) {
-    return builtin_arith(a, "%");
+    LASSERT_ARGC("%", a, 2);
+    lval *x = lval_pop(a, 0);
+    lval *y = lval_take(a, 0);
+    return lval_arith(x, y, MOD);
 }
 
 lval* builtin_exp(lenv *e, lval *a) {
-    return builtin_arith(a, "^");
+    LASSERT_ARGC("^", a, 2);
+    lval *x = lval_pop(a, 0);
+    lval *y = lval_take(a, 0);
+    return lval_arith(x, y, EXP);
 }
 
-lval* builtin_min(lenv *e, lval *a) {
-    return builtin_arith(a, "min");
+lval* builtin_lt(lenv *e, lval *a) {
+    LASSERT_ARGC("<", a, 2);
+    lval *x = lval_pop(a, 0);
+    lval *y = lval_take(a, 0);
+    x = lval_arith(x, y, LT);
+    if (x->type == LVAL_ERR) { return x; };
+    x->type = LVAL_BOOL;
+    x->val.bool = lval_is_true(x);
+    return x;
 }
 
-lval* builtin_max(lenv *e, lval *a) {
-    return builtin_arith(a, "max");
+lval* builtin_eq(lenv *e, lval *a) {
+    LASSERT_ARGC("=", a, 2);
+    lval *x = lval_pop(a, 0);
+    lval *y = lval_take(a, 0);
+    x = lval_arith(x, y, LT);
+    if (x->type == LVAL_ERR) { return x; };
+    x->type = LVAL_BOOL;
+    x->val.bool = lval_is_true(x);
+    return x;
 }
 
 lval *builtin_nth(lenv *e, lval *a) {
@@ -908,8 +889,8 @@ void add_builtins(lenv *e) {
     lenv_put(e, "/", lval_proc(builtin_div));
     lenv_put(e, "%", lval_proc(builtin_mod));
     lenv_put(e, "^", lval_proc(builtin_exp));
-    lenv_put(e, "min", lval_proc(builtin_min));
-    lenv_put(e, "max", lval_proc(builtin_max));
+    lenv_put(e, "<", lval_proc(builtin_lt));
+    lenv_put(e, "=", lval_proc(builtin_eq));
 
     // Logic functions
     lenv_put(e, "and", lval_proc(builtin_and));
