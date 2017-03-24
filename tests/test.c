@@ -30,14 +30,19 @@ static char *test_lval() {
 }
 
 static char *test_lenv() {
-    lenv *e = lenv_new();
+    lenv *e = lenv_new(NULL);
     lval *v = lval_lng(5);
     lenv_put(e, "foo", v);
     lval *w = lenv_get(e, "foo");
-    mu_assert(lval_equal(v, w), "GET: Did not get back what we put in the env.");
-    lval_del(v);
+    mu_assert(lval_equal(v, w), "GET: Did not find foo=5 in the env.");
     lval_del(w);
+    lenv *ee = lenv_new(e);
+    w = lenv_get(ee, "foo");
+    mu_assert(lval_equal(v, w), "GET: Did not find foo=5 in parent env.");
+    lval_del(w);
+    lval_del(v);
     lenv_del(e);
+    lenv_del(ee);
     return 0;
 }
 
@@ -49,13 +54,13 @@ static char *all_tests() {
 
 int main(int argc, char **argv) {
     char *result = all_tests();
+    printf("RAN %d TESTS\n", tests_run);
     if (result != 0) {
         printf("%s\n", result);
     }
     else {
         printf("ALL TESTS PASSED\n");
     }
-    printf("TESTS RUN: %d\n", tests_run);
 
     return result != 0;
 }
