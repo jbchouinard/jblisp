@@ -11,6 +11,10 @@ int main(int argc, char **argv) {
     puts("jblisp version " VERSION);
     puts("Press ^C to exit\n");
 
+    // Load language
+    exec_file(env, "lang/base.jbl");
+
+    // Load CLI-specified files
     for (int i=1; i < argc; i++) {
         exec_file(env, argv[i]);
     }
