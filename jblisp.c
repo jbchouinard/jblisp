@@ -53,6 +53,7 @@ struct _lval {
     int type;
     int count;
     int size;
+    lenv *env;
     union {
         enum {LFALSE=0, LTRUE=!LFALSE} bool;
         double dbl;
@@ -124,30 +125,34 @@ lval *lenv_get(lenv *e, char *sym) {
     return lval_err("Unbound symbol '%s'.", sym);
 }
 
-lval *lval_bool(int b) {
+lval *lval_new() {
     lval *v = malloc(sizeof(lval));
-    v->type = LVAL_BOOL;
-    v->val.bool = b ? LTRUE : LFALSE;
+    v->type = LVAL_ERR;
+    v->val.err = NULL;
+    v->env = NULL;
     v->count = 0;
     v->size = 0;
+    return v;
+}
+
+lval *lval_bool(int b) {
+    lval *v = lval_new();
+    v->type = LVAL_BOOL;
+    v->val.bool = b ? LTRUE : LFALSE;
     return v;
 }
 
 lval *lval_dbl(double x) {
-    lval *v = malloc(sizeof(lval));
+    lval *v = lval_new();
     v->type = LVAL_DBL;
     v->val.dbl = x;
-    v->count = 0;
-    v->size = 0;
     return v;
 }
 
 lval *lval_lng(long x) {
-    lval *v = malloc(sizeof(lval));
+    lval *v = lval_new();
     v->type = LVAL_LNG;
     v->val.lng = x;
-    v->count = 0;
-    v->size = 0;
     return v;
 }
 
@@ -155,10 +160,8 @@ lval *lval_err(char *fmt, ...) {
     va_list va;
     va_start(va, fmt);
 
-    lval *v = malloc(sizeof(lval));
+    lval *v = lval_new();
     v->type = LVAL_ERR;
-    v->count = 0;
-    v->size = 0;
     v->val.err = malloc(512);
     vsnprintf(v->val.err, 511, fmt, va);
     v->val.err = realloc(v->val.err, strlen(v->val.err)+1);
@@ -168,48 +171,38 @@ lval *lval_err(char *fmt, ...) {
 }
 
 lval *lval_sexpr(void) {
-    lval *v = malloc(sizeof(lval));
+    lval *v = lval_new();
     v->type = LVAL_SEXPR;
     v->val.cell = NULL;
-    v->count = 0;
-    v->size = 0;
     return v;
 }
 
 lval *lval_qexpr(void) {
-    lval *v = malloc(sizeof(lval));
+    lval *v = lval_new();
     v->type = LVAL_QEXPR;
     v->val.cell = NULL;
-    v->count = 0;
-    v->size = 0;
     return v;
 }
 
 lval *lval_sym(char *s) {
-    lval *v = malloc(sizeof(lval));
+    lval *v = lval_new();
     v->type = LVAL_SYM;
-    v->count = 0;
-    v->size = 0;
     v->val.sym = malloc(sizeof(strlen(s) + 1));
     strcpy(v->val.sym, s);
     return v;
 }
 
 lval *lval_proc(lbuiltin proc) {
-    lval *v = malloc(sizeof(lval));
+    lval *v = lval_new();
     v->type = LVAL_BUILTIN;
-    v->count = 0;
-    v->size = 0;
     v->val.proc = proc;
     return v;
 }
 
 lval *lval_lambda(void) {
-    lval *v = malloc(sizeof(lval));
+    lval *v = lval_new();
     v->type = LVAL_LAMBDA;
     v->val.cell = NULL;
-    v->count = 0;
-    v->size = 0;
     return v;
 }
 
