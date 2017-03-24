@@ -884,6 +884,28 @@ lval *builtin_apply(lenv *e, lval *a) {
     return lval_eval(e, a);
 }
 
+lval *builtin_error(lenv *e, lval *a) {
+    LASSERT_ARGC("error", a, 1);
+    LASSERT_ARGT("error", a, 0, LVAL_LNG);
+    lval* err = lval_err("%d", a->val.cell[0]->val.lng);
+    lval_del(a);
+    return err;
+}
+
+lval *builtin_assert(lenv *e, lval *a) {
+    LASSERT_ARGC("error", a, 2);
+    LASSERT_ARGT("error", a, 1, LVAL_LNG);
+    lval* pred = lval_pop(a, 0);
+    int errcode = a->val.cell[0]->val.lng;
+    lval_del(a);
+    if (!lval_is_true(pred)) {
+        lval_del(pred);
+        return lval_err("Assertion %d failed.", errcode);
+    } else {
+        return pred;
+    }
+}
+
 void add_builtins(lenv *e) {
     lenv_put(e, "def", lval_proc(builtin_def));
     lenv_put(e, "def*", lval_proc(builtin_def_global));
@@ -891,6 +913,8 @@ void add_builtins(lenv *e) {
     lenv_put(e, "is?", lval_proc(builtin_is));
     lenv_put(e, "\\", lval_proc(builtin_lambda));
     lenv_put(e, "apply", lval_proc(builtin_apply));
+    lenv_put(e, "error", lval_proc(builtin_error));
+    lenv_put(e, "assert", lval_proc(builtin_assert));
 
     // List procedures
     lenv_put(e, "list", lval_proc(builtin_list));

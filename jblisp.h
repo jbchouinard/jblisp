@@ -66,6 +66,8 @@ lval *builtin_def(lenv*, lval*);
 lval *builtin_def_global(lenv*, lval*);
 lval *builtin_lambda(lenv*, lval*);
 lval *builtin_apply(lenv*, lval*);
+lval *builtin_error(lenv*, lval*);
+lval *builtin_assert(lenv*, lval*);
 lval *builtin_equal(lenv*, lval*);
 lval *builtin_is(lenv*, lval*);
 
