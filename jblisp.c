@@ -74,11 +74,11 @@ struct _lenv {
     lval **vals;
 };
 
-lenv *lenv_new(void) {
+lenv *lenv_new(lenv *enc) {
     lenv *e = malloc(sizeof(lenv));
     e->count = 0;
     e->size = 0;
-    e->encl = NULL;
+    e->encl = enc;
     e->syms = NULL;
     e->vals = NULL;
     return e;
@@ -857,8 +857,7 @@ lval *builtin_lambda(lenv* e, lval *a) {
     lval* v = lval_lambda();
     lval_add(v, syms);
     lval_add(v, q);
-    v->env = lenv_new();
-    v->env->encl = e;
+    v->env = lenv_new(e);
     return v;
 }
 

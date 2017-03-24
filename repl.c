@@ -5,7 +5,7 @@
 #include "jblisp.h"
 
 int main(int argc, char **argv) {
-    lenv *env = lenv_new();
+    lenv *env = lenv_new(NULL);
     add_builtins(env);
     build_parser();
     puts("jblisp version " VERSION);

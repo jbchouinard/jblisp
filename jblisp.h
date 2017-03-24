@@ -17,7 +17,7 @@ typedef struct _lval lval;
 typedef struct _lenv lenv;
 typedef lval *(*lbuiltin)(lenv*, lval*);
 
-lenv *lenv_new(void);
+lenv *lenv_new(lenv*);
 lval *lenv_get(lenv*, char*);
 lval *lenv_pop(lenv*, char*);
 void lenv_del(lenv*);
