@@ -2,3 +2,8 @@
     (\ {sig body}
        {(def* (list (head sig))
               (\ (tail sig) body))}))
+
+(fun {> x y} {(< y x)})
+(fun {>= x y} {(not (< x y))})
+(fun {<= x y} {(not (< y x))})
+(fun {!= x y} {(not (= y x))})
