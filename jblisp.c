@@ -30,16 +30,18 @@
 mpc_parser_t *Boolean;
 mpc_parser_t *Number;
 mpc_parser_t *Symbol;
+mpc_parser_t *Chars;
+mpc_parser_t *String;
 mpc_parser_t *Sexpr;
 mpc_parser_t *Qexpr;
 mpc_parser_t *Expr;
 mpc_parser_t *JBLisp;
 
 // JBLisp builtin types
-enum { LVAL_BOOL, LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM,
+enum { LVAL_BOOL, LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM, LVAL_STR,
        LVAL_BUILTIN, LVAL_PROC, LVAL_SEXPR, LVAL_QEXPR };
 char* TYPE_NAMES[] = {
-    "boolean", "integer", "float", "error", "symbol",
+    "boolean", "integer", "float", "error", "symbol", "string",
     "builtin", "procedure", "S-expression", "Q-expression"
 };
 
@@ -53,6 +55,7 @@ struct _lval {
         long lng;
         char *err;
         char *sym;
+        char *str;
         lval **cell;
         lbuiltin builtin;
         lproc *proc;
@@ -212,8 +215,16 @@ lval *lval_qexpr(void) {
 lval *lval_sym(char *s) {
     lval *v = lval_new();
     v->type = LVAL_SYM;
-    v->val.sym = malloc(sizeof(strlen(s) + 1));
+    v->val.sym = malloc(strlen(s) + 1);
     strcpy(v->val.sym, s);
+    return v;
+}
+
+lval *lval_str(char *s) {
+    lval *v = lval_new();
+    v->type = LVAL_STR;
+    v->val.str = malloc(strlen(s)+1);
+    strcpy(v->val.str, s);
     return v;
 }
 
@@ -258,7 +269,10 @@ int lval_equal(lval *v, lval *w) {
             eq = v == w;
             break;
         case LVAL_SYM:
-            eq = !(strcmp(v->val.sym, w->val.sym));
+            eq = strcmp(v->val.sym, w->val.sym) == 0;
+            break;
+        case LVAL_STR:
+            eq = strcmp(v->val.str, w->val.sym) == 0;
             break;
         case LVAL_BUILTIN:
             eq = v->val.proc == w->val.proc;
@@ -306,6 +320,9 @@ void lval_del(lval *v) {
         case LVAL_SYM:
             free(v->val.sym);
             break;
+        case LVAL_STR:
+            free(v->val.str);
+            break;
         case LVAL_PROC:
             lproc_del(v->val.proc);
             break;
@@ -342,6 +359,10 @@ lval *lval_copy(lval *v) {
         case LVAL_SYM:
             x->val.sym = malloc(strlen(v->val.sym) + 1);
             strcpy(x->val.sym, v->val.sym);
+            break;
+        case LVAL_STR:
+            x->val.str = malloc(strlen(v->val.str) + 1);
+            strcpy(x->val.str, v->val.str);
             break;
         case LVAL_BUILTIN:
             x->val.builtin = v->val.builtin;
@@ -411,11 +432,22 @@ lval *lval_read_num(mpc_ast_t *ast) {
     }
 }
 
+lval *lval_read_str(char *s) {
+    int len = strlen(s);
+    char *unescaped = malloc(len - 1);
+    strncpy(unescaped, s+1, len - 2);
+    unescaped[len - 2] = '\0';
+    unescaped = mpcf_unescape(unescaped);
+    return lval_str(unescaped);
+}
+
 lval *lval_read(mpc_ast_t *ast) {
     if (strstr(ast->tag, "number"))
         return lval_read_num(ast);
     if (strstr(ast->tag, "symbol"))
         return lval_sym(ast->contents);
+    if (strstr(ast->tag, "string"))
+        return lval_read_str(ast->contents);
     if (strstr(ast->tag, "boolean")) {
         return lval_bool(
             (strcmp(ast->contents, "#t") == 0) ? LTRUE : LFALSE);
@@ -457,6 +489,14 @@ void lval_print_expr(lval *v, char open, char close) {
     putchar(close);
 }
 
+void lval_print_str(lval* v) {
+    char *escaped = malloc(strlen(v->val.str) + 1);
+    strcpy(escaped, v->val.str);
+    escaped = mpcf_escape(escaped);
+    printf("\"%s\"", escaped);
+    free(escaped);
+}
+
 void lval_print(lval *v) {
     switch (v->type) {
         case LVAL_BOOL:
@@ -471,6 +511,9 @@ void lval_print(lval *v) {
         case LVAL_SYM:
             printf("%s", v->val.sym);
             break;
+        case LVAL_STR:
+            lval_print_str(v);
+            break;
         case LVAL_SEXPR:
             lval_print_expr(v, '(', ')');
             break;
@@ -478,10 +521,10 @@ void lval_print(lval *v) {
             lval_print_expr(v, '{', '}');
             break;
         case LVAL_BUILTIN:
-            printf("<builtin procedure at %p>", (void*) v->val.proc);
+            printf("<builtin>");
             break;
         case LVAL_PROC:
-            printf("<lambda procedure>");
+            printf("<procedure>");
             break;
         case LVAL_ERR:
             printf("Error: %s", v->val.err);
@@ -1135,6 +1178,7 @@ void build_parser() {
     Boolean   = mpc_new("boolean");
     Number    = mpc_new("number");
     Symbol    = mpc_new("symbol");
+    String    = mpc_new("string");
     Sexpr     = mpc_new("sexpr");
     Qexpr     = mpc_new("qexpr");
     Expr      = mpc_new("expr");
@@ -1145,11 +1189,13 @@ void build_parser() {
             boolean  : /(#t)|(#f)/ ;                                          \
             number   : /((-?[0-9]*[.][0-9]+)|(-?[0-9]+[.]?))([eE]-?[0-9]+)?/ ;\
             symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&?\\^]+/ ;                 \
+            string   : /\"([^\\\"\\\\]|\\\\.)*\"/ ;                           \
             sexpr    : '(' <expr>* ')' ;                                      \
             qexpr    : '{' <expr>* '}' ;                                      \
-            expr     : <boolean > | <number> | <symbol> | <sexpr> | <qexpr> ; \
+            expr     : <boolean > | <number> | <symbol> | <string> |          \
+                       <sexpr> | <qexpr> ;                                    \
             jblisp   : /^/ <expr>* /$/ ;                                      \
         ",
-        Boolean, Number, Symbol, Sexpr, Qexpr, Expr, JBLisp
+        Boolean, Number, Symbol, String, Sexpr, Qexpr, Expr, JBLisp
     );
 }
