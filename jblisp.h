@@ -5,6 +5,16 @@
 
 #define VERSION "0.6.0"
 
+extern long COUNT_LVALCPY;
+extern long COUNT_LVALNEW;
+extern long COUNT_LVALDEL;
+extern long COUNT_LPROCCPY;
+extern long COUNT_LPROCNEW;
+extern long COUNT_LPROCDEL;
+extern long COUNT_LENVCPY;
+extern long COUNT_LENVNEW;
+extern long COUNT_LENVDEL;
+
 typedef struct _lval lval;
 typedef struct _lenv lenv;
 typedef struct _lproc lproc;

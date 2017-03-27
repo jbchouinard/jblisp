@@ -38,6 +38,18 @@ int main(int argc, char **argv) {
         exec_line(env, input);
         free(input);
     }
+    printf("LVALs created: %li\n", COUNT_LVALNEW);
+    printf("LVALs copied: %li\n", COUNT_LVALCPY);
+    printf("LVALs deleted: %li\n", COUNT_LVALDEL);
+    printf("LVALs left: %li\n\n", COUNT_LVALNEW+COUNT_LVALCPY-COUNT_LVALDEL);
+    printf("LPROCs created: %li\n", COUNT_LPROCNEW);
+    printf("LPROCs copied: %li\n", COUNT_LPROCCPY);
+    printf("LPROCs deleted: %li\n", COUNT_LPROCDEL);
+    printf("LPROCs left: %li\n\n", COUNT_LPROCNEW+COUNT_LPROCCPY-COUNT_LPROCDEL);
+    printf("LENVs created: %li\n", COUNT_LENVNEW);
+    printf("LENVs copied: %li\n", COUNT_LENVCPY);
+    printf("LENVs deleted: %li\n", COUNT_LENVDEL);
+    printf("LENVs left: %li\n\n", COUNT_LENVNEW+COUNT_LENVCPY-COUNT_LENVDEL);
 
     cleanup_parser();
     return 0;
