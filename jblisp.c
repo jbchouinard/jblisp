@@ -291,9 +291,11 @@ int lval_equal(lval *v, lval *w) {
         case LVAL_BUILTIN:
             eq = v->val.proc == w->val.proc;
             break;
+        case LVAL_PROC:
+            eq = v == w;
+            break;
         case LVAL_SEXPR:
         case LVAL_QEXPR:
-        case LVAL_PROC:
             if (v->count == w->count) {
                 eq = 1;
                 for (int i=0; i < v->count; i++) {
@@ -396,6 +398,7 @@ lval *lval_copy(lval *v) {
         case LVAL_SEXPR:
         case LVAL_QEXPR:
             x->val.cell = malloc(sizeof(lval*) * x->count);
+            x->size = x->count;
             for (int i=0; i < v->count; i++) {
                 x->val.cell[i] = lval_copy(v->val.cell[i]);
             }
@@ -410,7 +413,7 @@ lval *lval_insert(lval *x, lval *v, int n) {
     x->count++;
     if (x->count >= x->size) {
         x->size = x->size == 0 ? x->count : x->size  *2;
-        x->val.cell = realloc(x->val.cell, sizeof(lval*)  *x->size);
+        x->val.cell = realloc(x->val.cell, sizeof(lval*) * x->size);
     }
     memmove(x->val.cell+n+1, x->val.cell+n, (x->count-n-1) * sizeof(lval*));
     x->val.cell[n] = v;
@@ -461,7 +464,9 @@ lval *lval_read_str(char *s) {
     strncpy(unescaped, s+1, len - 2);
     unescaped[len - 2] = '\0';
     unescaped = mpcf_unescape(unescaped);
-    return lval_str(unescaped, strlen(unescaped));
+    lval* v = lval_str(unescaped, strlen(unescaped));
+    free(unescaped);
+    return v;
 }
 
 lval *lval_read(mpc_ast_t *ast) {
@@ -1123,7 +1128,7 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
     if (procval->type == LVAL_BUILTIN) {
         result = procval->val.builtin(e, v);
     } else if (procval->type == LVAL_PROC) {
-        result = lval_call(e, lproc_copy(procval->val.proc), v);
+        result = lval_call(e, procval->val.proc, v);
     } else {
         result = lval_err(
             "Object of type '%s' is not applicable.",
@@ -1144,7 +1149,6 @@ lval *lval_call(lenv *e, lproc *p, lval *args) {
         if (strcmp(par->val.str, "&") == 0) {
             lval_del(par);
             if (p->params->count != 1) {
-                lproc_del(p);
                 lval_del(args);
                 return lval_err("Expected a single symbol after '&'.");
             }
@@ -1160,19 +1164,18 @@ lval *lval_call(lenv *e, lproc *p, lval *args) {
         lval_del(arg);
     }
     if (p->params->count || args->count) {
-        lproc_del(p);
         lval_del(args);
         return lval_err("Wrong number of arguments to lambda.");
     }
     // Evaluate
-    lval *result;
+    lval *result = NULL;
     lenv *evalenv = lenv_copy(p->env);
     while (p->body->count) {
+        if (result != NULL) { lval_del(result); }
         result = lval_eval(evalenv, lval_pop(p->body, 0));
         if (result->type == LVAL_ERR) { break; }
     }
     // Cleanup
-    lproc_del(p);
     lval_del(args);
     return result;
 }
