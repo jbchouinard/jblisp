@@ -1,9 +1,5 @@
 # TODO
 
-## Add string type
-
-## Modify assert to take str message instead of number
-
 ## Implement error handling facilities
 
 Catch errors of type `type`:
