@@ -38,6 +38,11 @@ int main(int argc, char **argv) {
         exec_line(env, input);
         free(input);
     }
+
+    for (int i=0; i < (COUNT_LENVNEW+COUNT_LENVCPY); i++) {
+        lenv_del(LENVS[i]);
+    }
+
     printf("LVALs created: %li\n", COUNT_LVALNEW);
     printf("LVALs copied: %li\n", COUNT_LVALCPY);
     printf("LVALs deleted: %li\n", COUNT_LVALDEL);

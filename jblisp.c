@@ -36,6 +36,7 @@ long COUNT_LPROCDEL;
 long COUNT_LVALNEW;
 long COUNT_LVALCPY;
 long COUNT_LVALDEL;
+lenv *LENVS[1000];
 
 // JBLisp builtin types
 enum { LVAL_BOOL, LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM, LVAL_STR,
@@ -104,8 +105,9 @@ void lproc_del(lproc *p) {
 }
 
 lenv *lenv_new(lenv *enc) {
-    COUNT_LENVNEW++;
     lenv *e = malloc(sizeof(lenv));
+    LENVS[COUNT_LENVNEW+COUNT_LENVCPY] = e;
+    COUNT_LENVNEW++;
     e->count = 0;
     e->size = 0;
     e->encl = enc;
@@ -115,8 +117,9 @@ lenv *lenv_new(lenv *enc) {
 }
 
 lenv *lenv_copy(lenv *e) {
-    COUNT_LENVCPY++;
     lenv *n = malloc(sizeof(lenv));
+    LENVS[COUNT_LENVNEW+COUNT_LENVCPY] = n;
+    COUNT_LENVCPY++;
     n->encl = e->encl;
     n->count = e->count;
     n->size = e->count;
@@ -131,7 +134,7 @@ lenv *lenv_copy(lenv *e) {
 }
 
 void lenv_del(lenv *e) {
-    COUNT_LENVDEL--;
+    COUNT_LENVDEL++;
     for (int i=0; i < e->count; i++) {
         free(e->syms[i]);
         lval_del(e->vals[i]);

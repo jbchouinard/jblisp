@@ -20,6 +20,8 @@ typedef struct _lenv lenv;
 typedef struct _lproc lproc;
 typedef lval *(*lbuiltin)(lenv*, lval*);
 
+extern lenv *LENVS[];
+
 lenv *lenv_new(lenv*);
 lval *lenv_get(lenv*, char*);
 lval *lenv_pop(lenv*, char*);
