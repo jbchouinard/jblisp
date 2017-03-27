@@ -53,8 +53,6 @@ struct _lval {
         enum {LFALSE=0, LTRUE=!LFALSE} bool;
         double dbl;
         long lng;
-        char *err;
-        char *sym;
         char *str;
         lval **cell;
         lbuiltin builtin;
@@ -190,9 +188,9 @@ lval *lval_err(char *fmt, ...) {
 
     lval *v = lval_new();
     v->type = LVAL_ERR;
-    v->val.err = malloc(512);
-    vsnprintf(v->val.err, 511, fmt, va);
-    v->val.err = realloc(v->val.err, strlen(v->val.err)+1);
+    v->val.str = malloc(512);
+    vsnprintf(v->val.str, 511, fmt, va);
+    v->val.str = realloc(v->val.str, strlen(v->val.str)+1);
 
     va_end(va);
     return v;
@@ -214,17 +212,20 @@ lval *lval_qexpr(void) {
 
 lval *lval_sym(char *s) {
     lval *v = lval_new();
+    int l = strlen(s);
     v->type = LVAL_SYM;
-    v->val.sym = malloc(strlen(s) + 1);
-    strcpy(v->val.sym, s);
+    v->count = l;
+    v->val.str = malloc(l + 1);
+    strcpy(v->val.str, s);
     return v;
 }
 
-lval *lval_str(char *s) {
+lval *lval_str(char *s, int count) {
     lval *v = lval_new();
     v->type = LVAL_STR;
-    v->val.str = malloc(strlen(s)+1);
-    strcpy(v->val.str, s);
+    v->val.str = malloc(count + 1);
+    v->count = count;
+    strncpy(v->val.str, s, count);
     return v;
 }
 
@@ -269,10 +270,8 @@ int lval_equal(lval *v, lval *w) {
             eq = v == w;
             break;
         case LVAL_SYM:
-            eq = strcmp(v->val.sym, w->val.sym) == 0;
-            break;
         case LVAL_STR:
-            eq = strcmp(v->val.str, w->val.sym) == 0;
+            eq = v->count == w->count && strcmp(v->val.str, w->val.str) == 0;
             break;
         case LVAL_BUILTIN:
             eq = v->val.proc == w->val.proc;
@@ -315,11 +314,7 @@ void lval_del(lval *v) {
         case LVAL_BUILTIN:
             break;
         case LVAL_ERR:
-            free(v->val.err);
-            break;
         case LVAL_SYM:
-            free(v->val.sym);
-            break;
         case LVAL_STR:
             free(v->val.str);
             break;
@@ -353,16 +348,15 @@ lval *lval_copy(lval *v) {
             x->val.lng = v->val.lng;
             break;
         case LVAL_ERR:
-            x->val.err = malloc(strlen(v->val.err) + 1);
-            strcpy(x->val.err, v->val.err);
-            break;
-        case LVAL_SYM:
-            x->val.sym = malloc(strlen(v->val.sym) + 1);
-            strcpy(x->val.sym, v->val.sym);
-            break;
-        case LVAL_STR:
             x->val.str = malloc(strlen(v->val.str) + 1);
             strcpy(x->val.str, v->val.str);
+            break;
+        case LVAL_SYM:
+        case LVAL_STR:
+            x->count = v->count;
+            x->val.str = malloc(v->count+1);
+            memcpy((void*) x->val.str, (void*) v->val.str, v->count+1);
+            x->val.str[x->count] = '\0';
             break;
         case LVAL_BUILTIN:
             x->val.builtin = v->val.builtin;
@@ -438,7 +432,7 @@ lval *lval_read_str(char *s) {
     strncpy(unescaped, s+1, len - 2);
     unescaped[len - 2] = '\0';
     unescaped = mpcf_unescape(unescaped);
-    return lval_str(unescaped);
+    return lval_str(unescaped, strlen(unescaped));
 }
 
 lval *lval_read(mpc_ast_t *ast) {
@@ -490,7 +484,7 @@ void lval_print_expr(lval *v, char open, char close) {
 }
 
 void lval_print_str(lval* v) {
-    char *escaped = malloc(strlen(v->val.str) + 1);
+    char *escaped = malloc(v->count + 1);
     strcpy(escaped, v->val.str);
     escaped = mpcf_escape(escaped);
     printf("\"%s\"", escaped);
@@ -509,7 +503,7 @@ void lval_print(lval *v) {
             printf("%lf", v->val.dbl);
             break;
         case LVAL_SYM:
-            printf("%s", v->val.sym);
+            printf("%s", v->val.str);
             break;
         case LVAL_STR:
             lval_print_str(v);
@@ -527,7 +521,7 @@ void lval_print(lval *v) {
             printf("<procedure>");
             break;
         case LVAL_ERR:
-            printf("Error: %s", v->val.err);
+            printf("Error: %s", v->val.str);
             break;
         default:
             printf("Error: LVAL has invalid type.");
@@ -922,7 +916,7 @@ lval *builtin_def(lenv* e, lval *a) {
         }
     }
     for (int i=0; i < ks->count; i++) {
-        lenv_put(e, ks->val.cell[i]->val.sym, a->val.cell[i]);
+        lenv_put(e, ks->val.cell[i]->val.str, a->val.cell[i]);
     }
     lval_del(ks);
     return a;
@@ -1040,7 +1034,7 @@ lval *lval_eval(lenv *e, lval *v) {
     lval *x;
     switch (v->type) {
         case LVAL_SYM:
-            x = lenv_get(e, v->val.sym);
+            x = lenv_get(e, v->val.str);
             lval_del(v);
             break;
         case LVAL_SEXPR:
@@ -1098,7 +1092,7 @@ lval *lval_call(lenv *e, lproc *p, lval *args) {
         lval *arg;
         // Special syntax for arg list like {x & xs}
         // All remaining args go in a qexpr in xs
-        if (strcmp(par->val.sym, "&") == 0) {
+        if (strcmp(par->val.str, "&") == 0) {
             lval_del(par);
             if (p->params->count != 1) {
                 lproc_del(p);
@@ -1112,7 +1106,7 @@ lval *lval_call(lenv *e, lproc *p, lval *args) {
         } else {
             arg = lval_pop(args, 0);
         }
-        lenv_put(p->env, par->val.sym, arg);
+        lenv_put(p->env, par->val.str, arg);
         lval_del(par);
         lval_del(arg);
     }
