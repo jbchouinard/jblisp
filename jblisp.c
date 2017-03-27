@@ -306,6 +306,20 @@ int lval_is_true(lval *v) {
     return t;
 }
 
+lval *lval_str_concat(lval **a, int n) {
+    int count = 0;
+    lval *res = lval_str("", 0);
+    for (int i=0; i < n; i++) {
+        res->val.str = realloc(res->val.str, count + a[i]->count + 1);
+        memcpy((void*) res->val.str + count, a[i]->val.str, a[i]->count);
+        count += a[i]->count;
+        lval_del(a[i]);
+    }
+    res->count = count;
+    res->val.str[count] = '\0';
+    return res;
+}
+
 void lval_del(lval *v) {
     switch(v->type) {
         case LVAL_BOOL:
@@ -992,6 +1006,18 @@ lval *builtin_assert(lenv *e, lval *a) {
     return v;
 }
 
+lval *builtin_concat(lenv *e, lval *a) {
+    for (int i=0; i < a->count; i++) {
+        LASSERT(a, a->val.cell[i]->type == LVAL_STR,
+                "Builtin 'concat' take string arguments only.");
+    }
+    lval *r = lval_str_concat(a->val.cell, a->count);
+    a->val.cell = NULL;
+    a->count = 0;
+    lval_del(a);
+    return r;
+}
+
 void add_builtins(lenv *e) {
     lenv_put(e, "def", lval_builtin(builtin_def));
     lenv_put(e, "def*", lval_builtin(builtin_def_global));
@@ -1028,6 +1054,9 @@ void add_builtins(lenv *e) {
     lenv_put(e, "and", lval_builtin(builtin_and));
     lenv_put(e, "or", lval_builtin(builtin_or));
     lenv_put(e, "not", lval_builtin(builtin_not));
+
+    // String procedures
+    lenv_put(e, "concat", lval_builtin(builtin_concat));
 }
 
 lval *lval_eval(lenv *e, lval *v) {
