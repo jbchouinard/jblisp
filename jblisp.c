@@ -987,16 +987,15 @@ lval *builtin_error(lenv *e, lval *a) {
 
 lval *builtin_assert(lenv *e, lval *a) {
     LASSERT_ARGC("error", a, 2);
-    LASSERT_ARGT("error", a, 1, LVAL_LNG);
-    lval* pred = lval_pop(a, 0);
-    int errcode = a->val.cell[0]->val.lng;
-    lval_del(a);
-    if (!lval_is_true(pred)) {
-        lval_del(pred);
-        return lval_err("Assertion %d failed.", errcode);
+    LASSERT_ARGT("error", a, 1, LVAL_STR);
+    lval *v;
+    if (!lval_is_true(a->val.cell[0])) {
+        v = lval_err("Assertion error: %s", a->val.cell[1]->val.str);
     } else {
-        return pred;
+        v = lval_pop(a, 0);
     }
+    lval_del(a);
+    return v;
 }
 
 void add_builtins(lenv *e) {
