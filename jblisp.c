@@ -556,7 +556,7 @@ lval *lval_lng_to_dbl(lval *v) {
 
 enum {ADD, SUB, MUL, DIV, MOD, EXP, LT, EQ};
 
-lval* lval_arith(lval *x, lval *y, int op) {
+lval *lval_arith(lval *x, lval *y, int op) {
     int type = y->type;
     if (x->type == y->type) {
         type = x->type;
@@ -651,31 +651,43 @@ lval* lval_arith(lval *x, lval *y, int op) {
 }
 
 lval* builtin_add(lenv *e, lval *a) {
-    LASSERT_ARGC("+", a, 2);
-    lval *x = lval_pop(a, 0);
-    lval *y = lval_take(a, 0);
-    return lval_arith(x, y, ADD);
+    lval *x = lval_lng(0);
+    while (a->count) {
+        x = lval_arith(x, lval_pop(a, 0), ADD);
+    }
+    lval_del(a);
+    return x;
 }
 
 lval* builtin_sub(lenv *e, lval *a) {
-    LASSERT_ARGC("-", a, 2);
+    LASSERT(a, a->count > 0, "Builtin '-' expects at least 1 argument.");
+    if (a->count == 1) { return lval_arith(lval_lng(0), lval_take(a, 0), SUB); }
     lval *x = lval_pop(a, 0);
-    lval *y = lval_take(a, 0);
-    return lval_arith(x, y, SUB);
+    while (a->count) {
+        x = lval_arith(x, lval_pop(a, 0), SUB);
+    }
+    lval_del(a);
+    return x;
 }
 
 lval* builtin_mul(lenv *e, lval *a) {
-    LASSERT_ARGC("*", a, 2);
-    lval *x = lval_pop(a, 0);
-    lval *y = lval_take(a, 0);
-    return lval_arith(x, y, MUL);
+    lval *x = lval_lng(1);
+    while (a->count) {
+        x = lval_arith(x, lval_pop(a, 0), MUL);
+    }
+    lval_del(a);
+    return x;
 }
 
 lval* builtin_div(lenv *e, lval *a) {
-    LASSERT_ARGC("/", a, 2);
+    LASSERT(a, a->count > 0, "Builtin '/' expects at least 1 argument.");
+    if (a->count == 1) { return lval_arith(lval_lng(1), lval_take(a, 0), DIV); }
     lval *x = lval_pop(a, 0);
-    lval *y = lval_take(a, 0);
-    return lval_arith(x, y, DIV);
+    while (a->count) {
+        x = lval_arith(x, lval_pop(a, 0), DIV);
+    }
+    lval_del(a);
+    return x;
 }
 
 lval* builtin_mod(lenv *e, lval *a) {
@@ -699,9 +711,6 @@ lval* builtin_lt(lenv *e, lval *a) {
     x = lval_arith(x, y, LT);
     lval *res;
     switch (x->type) {
-        case LVAL_ERR:
-            res = x;
-            break;
         case LVAL_LNG:
             res = lval_bool(x->val.lng);
             lval_del(x);
@@ -719,21 +728,17 @@ lval* builtin_eq(lenv *e, lval *a) {
     lval *x = lval_pop(a, 0);
     lval *y = lval_take(a, 0);
     x = lval_arith(x, y, EQ);
-    lval *res;
+    long res;
     switch (x->type) {
-        case LVAL_ERR:
-            res = x;
-            break;
         case LVAL_LNG:
-            res = lval_bool(x->val.lng);
-            lval_del(x);
+            res = x->val.lng;
             break;
         case LVAL_DBL:
-            res = lval_bool((long) x->val.dbl);
-            lval_del(x);
+            res = (long) x->val.dbl;
             break;
     }
-    return res;
+    lval_del(x);
+    return lval_bool(res);
 }
 
 lval *builtin_nth(lenv *e, lval *a) {
