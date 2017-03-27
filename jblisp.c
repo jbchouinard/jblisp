@@ -1038,45 +1038,51 @@ lval *builtin_concat(lenv *e, lval *a) {
     return r;
 }
 
+void add_builtin(lenv *e, char *sym, lbuiltin bltn) {
+    lval *v = lval_builtin(bltn);
+    lenv_put(e, sym, v);
+    lval_del(v);
+}
+
 void add_builtins(lenv *e) {
-    lenv_put(e, "def", lval_builtin(builtin_def));
-    lenv_put(e, "def*", lval_builtin(builtin_def_global));
-    lenv_put(e, "equal?", lval_builtin(builtin_equal));
-    lenv_put(e, "is?", lval_builtin(builtin_is));
-    lenv_put(e, "\\", lval_builtin(builtin_lambda));
-    lenv_put(e, "apply", lval_builtin(builtin_apply));
-    lenv_put(e, "error", lval_builtin(builtin_error));
-    lenv_put(e, "assert", lval_builtin(builtin_assert));
+    add_builtin(e, "def", builtin_def);
+    add_builtin(e, "def*", builtin_def_global);
+    add_builtin(e, "equal?", builtin_equal);
+    add_builtin(e, "is?", builtin_is);
+    add_builtin(e, "\\", builtin_lambda);
+    add_builtin(e, "apply", builtin_apply);
+    add_builtin(e, "error", builtin_error);
+    add_builtin(e, "assert", builtin_assert);
 
     // List procedures
-    lenv_put(e, "list", lval_builtin(builtin_list));
-    lenv_put(e, "eval", lval_builtin(builtin_eval));
-    lenv_put(e, "join", lval_builtin(builtin_join));
-    lenv_put(e, "cons", lval_builtin(builtin_cons));
-    lenv_put(e, "len", lval_builtin(builtin_len));
-    lenv_put(e, "head", lval_builtin(builtin_head));
-    lenv_put(e, "tail", lval_builtin(builtin_tail));
-    lenv_put(e, "init", lval_builtin(builtin_init));
-    lenv_put(e, "last", lval_builtin(builtin_last));
-    lenv_put(e, "nth", lval_builtin(builtin_nth));
+    add_builtin(e, "list", builtin_list);
+    add_builtin(e, "eval", builtin_eval);
+    add_builtin(e, "join", builtin_join);
+    add_builtin(e, "cons", builtin_cons);
+    add_builtin(e, "len", builtin_len);
+    add_builtin(e, "head", builtin_head);
+    add_builtin(e, "tail", builtin_tail);
+    add_builtin(e, "init", builtin_init);
+    add_builtin(e, "last", builtin_last);
+    add_builtin(e, "nth", builtin_nth);
 
     // Arithmetic
-    lenv_put(e, "+", lval_builtin(builtin_add));
-    lenv_put(e, "-", lval_builtin(builtin_sub));
-    lenv_put(e, "*", lval_builtin(builtin_mul));
-    lenv_put(e, "/", lval_builtin(builtin_div));
-    lenv_put(e, "%", lval_builtin(builtin_mod));
-    lenv_put(e, "^", lval_builtin(builtin_exp));
-    lenv_put(e, "<", lval_builtin(builtin_lt));
-    lenv_put(e, "=", lval_builtin(builtin_eq));
+    add_builtin(e, "+", builtin_add);
+    add_builtin(e, "-", builtin_sub);
+    add_builtin(e, "*", builtin_mul);
+    add_builtin(e, "/", builtin_div);
+    add_builtin(e, "%", builtin_mod);
+    add_builtin(e, "^", builtin_exp);
+    add_builtin(e, "<", builtin_lt);
+    add_builtin(e, "=", builtin_eq);
 
     // Logic functions
-    lenv_put(e, "and", lval_builtin(builtin_and));
-    lenv_put(e, "or", lval_builtin(builtin_or));
-    lenv_put(e, "not", lval_builtin(builtin_not));
+    add_builtin(e, "and", builtin_and);
+    add_builtin(e, "or", builtin_or);
+    add_builtin(e, "not", builtin_not);
 
     // String procedures
-    lenv_put(e, "concat", lval_builtin(builtin_concat));
+    add_builtin(e, "concat", builtin_concat);
 }
 
 lval *lval_eval(lenv *e, lval *v) {
