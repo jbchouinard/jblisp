@@ -18,7 +18,7 @@
 
 #define LASSERT_ARGT(fname, args, idx, exp_type)                           \
     if (args->val.cell[idx]->type != exp_type) {                           \
-        lval* err = lval_err(                                              \
+        lval *err = lval_err(                                              \
             "Procedure '%s' expected argument %i of type '%s', got '%s'.", \
             fname, idx, TYPE_NAMES[exp_type],                              \
             TYPE_NAMES[args->val.cell[idx]->type]);                        \
@@ -40,7 +40,7 @@ mpc_parser_t *JBLisp;
 // JBLisp builtin types
 enum { LVAL_BOOL, LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM, LVAL_STR,
        LVAL_BUILTIN, LVAL_PROC, LVAL_SEXPR, LVAL_QEXPR };
-char* TYPE_NAMES[] = {
+char *TYPE_NAMES[] = {
     "boolean", "integer", "float", "error", "symbol", "string",
     "builtin", "procedure", "S-expression", "Q-expression"
 };
@@ -497,7 +497,7 @@ void lval_print_expr(lval *v, char open, char close) {
     putchar(close);
 }
 
-void lval_print_str(lval* v) {
+void lval_print_str(lval *v) {
     char *escaped = malloc(v->count + 1);
     strcpy(escaped, v->val.str);
     escaped = mpcf_escape(escaped);
@@ -650,7 +650,7 @@ lval *lval_arith(lval *x, lval *y, int op) {
     return x;
 }
 
-lval* builtin_add(lenv *e, lval *a) {
+lval *builtin_add(lenv *e, lval *a) {
     lval *x = lval_lng(0);
     while (a->count) {
         x = lval_arith(x, lval_pop(a, 0), ADD);
@@ -659,7 +659,7 @@ lval* builtin_add(lenv *e, lval *a) {
     return x;
 }
 
-lval* builtin_sub(lenv *e, lval *a) {
+lval *builtin_sub(lenv *e, lval *a) {
     LASSERT(a, a->count > 0, "Builtin '-' expects at least 1 argument.");
     if (a->count == 1) { return lval_arith(lval_lng(0), lval_take(a, 0), SUB); }
     lval *x = lval_pop(a, 0);
@@ -670,7 +670,7 @@ lval* builtin_sub(lenv *e, lval *a) {
     return x;
 }
 
-lval* builtin_mul(lenv *e, lval *a) {
+lval *builtin_mul(lenv *e, lval *a) {
     lval *x = lval_lng(1);
     while (a->count) {
         x = lval_arith(x, lval_pop(a, 0), MUL);
@@ -679,7 +679,7 @@ lval* builtin_mul(lenv *e, lval *a) {
     return x;
 }
 
-lval* builtin_div(lenv *e, lval *a) {
+lval *builtin_div(lenv *e, lval *a) {
     LASSERT(a, a->count > 0, "Builtin '/' expects at least 1 argument.");
     if (a->count == 1) { return lval_arith(lval_lng(1), lval_take(a, 0), DIV); }
     lval *x = lval_pop(a, 0);
@@ -690,21 +690,21 @@ lval* builtin_div(lenv *e, lval *a) {
     return x;
 }
 
-lval* builtin_mod(lenv *e, lval *a) {
+lval *builtin_mod(lenv *e, lval *a) {
     LASSERT_ARGC("%", a, 2);
     lval *x = lval_pop(a, 0);
     lval *y = lval_take(a, 0);
     return lval_arith(x, y, MOD);
 }
 
-lval* builtin_exp(lenv *e, lval *a) {
+lval *builtin_exp(lenv *e, lval *a) {
     LASSERT_ARGC("^", a, 2);
     lval *x = lval_pop(a, 0);
     lval *y = lval_take(a, 0);
     return lval_arith(x, y, EXP);
 }
 
-lval* builtin_lt(lenv *e, lval *a) {
+lval *builtin_lt(lenv *e, lval *a) {
     LASSERT_ARGC("<", a, 2);
     lval *x = lval_pop(a, 0);
     lval *y = lval_take(a, 0);
@@ -723,7 +723,7 @@ lval* builtin_lt(lenv *e, lval *a) {
     return res;
 }
 
-lval* builtin_eq(lenv *e, lval *a) {
+lval *builtin_eq(lenv *e, lval *a) {
     LASSERT_ARGC("=", a, 2);
     lval *x = lval_pop(a, 0);
     lval *y = lval_take(a, 0);
@@ -852,7 +852,7 @@ lval *builtin_init(lenv *e, lval *a) {
     return x;
 }
 
-lval *builtin_last(lenv* e, lval *a) {
+lval *builtin_last(lenv *e, lval *a) {
     LASSERT_ARGC("last", a, 1);
     LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
         "Procedure 'last' only applies to Q expressions.");
@@ -861,7 +861,7 @@ lval *builtin_last(lenv* e, lval *a) {
     return lval_take(x, x->count-1);
 }
 
-lval *builtin_equal(lenv* e, lval *a) {
+lval *builtin_equal(lenv *e, lval *a) {
     LASSERT_ARGC("equal?", a, 2);
 
     int eq = lval_equal(a->val.cell[0], a->val.cell[1]);
@@ -869,7 +869,7 @@ lval *builtin_equal(lenv* e, lval *a) {
     return lval_bool(eq);
 }
 
-lval *builtin_is(lenv* e, lval *a) {
+lval *builtin_is(lenv *e, lval *a) {
     LASSERT_ARGC("equal?", a, 2);
 
     lval *v = a->val.cell[1];
@@ -877,7 +877,7 @@ lval *builtin_is(lenv* e, lval *a) {
     return lval_lng(lval_is(v, w));
 }
 
-lval *builtin_and(lenv* e, lval *a) {
+lval *builtin_and(lenv *e, lval *a) {
     int i;
     for (i=0; i < a->count; i++) {
         if (!lval_is_true(a->val.cell[i])) {
@@ -892,7 +892,7 @@ lval *builtin_and(lenv* e, lval *a) {
     }
 }
 
-lval *builtin_or(lenv* e, lval *a) {
+lval *builtin_or(lenv *e, lval *a) {
     int i;
     for (i=0; i < a->count; i++) {
         if (lval_is_true(a->val.cell[i])) {
@@ -907,15 +907,15 @@ lval *builtin_or(lenv* e, lval *a) {
     }
 }
 
-lval *builtin_not(lenv* e, lval *a) {
+lval *builtin_not(lenv *e, lval *a) {
     LASSERT_ARGC("not", a, 1);
-    lval* v = lval_take(a, 0);
-    lval* b = lval_bool(lval_is_true(v) ? LFALSE : LTRUE);
+    lval *v = lval_take(a, 0);
+    lval *b = lval_bool(lval_is_true(v) ? LFALSE : LTRUE);
     lval_del(v);
     return b;
 }
 
-lval *builtin_def(lenv* e, lval *a) {
+lval *builtin_def(lenv *e, lval *a) {
     LASSERT(a, a->count > 1,
             "Builtin 'def' expected at least 2 arguments.");
     LASSERT_ARGT("def", a, 0, LVAL_QEXPR);
@@ -968,7 +968,7 @@ lval *builtin_lambda(lenv *e, lval *a) {
         return lval_err("Invalid lambda expression - empty procedure body");
     }
 
-    lval* v = lval_proc();
+    lval *v = lval_proc();
     v->val.proc->env = lenv_new(e);
     v->val.proc->params = syms;
     v->val.proc->body = q;
@@ -993,7 +993,7 @@ lval *builtin_apply(lenv *e, lval *a) {
 lval *builtin_error(lenv *e, lval *a) {
     LASSERT_ARGC("error", a, 1);
     LASSERT_ARGT("error", a, 0, LVAL_LNG);
-    lval* err = lval_err("%d", a->val.cell[0]->val.lng);
+    lval *err = lval_err("%d", a->val.cell[0]->val.lng);
     lval_del(a);
     return err;
 }
