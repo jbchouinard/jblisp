@@ -34,3 +34,7 @@
 (fun {g} {(def {z} 100)
           (f 10)})
 (assert (= 111 ((g) 1)) "Closures are broken")
+
+(assert (equal? "foo" "foo") "Strings of same value should be equal")
+(assert-not (equal? "foo" "bar") "Strings of different values should NOT be equal")
+(assert (equal? "foobar" (concat "foo" "bar")) "Error in string concatenation")
