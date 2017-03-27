@@ -323,20 +323,6 @@ int lval_is_true(lval *v) {
     return t;
 }
 
-lval *lval_str_concat(lval **a, int n) {
-    int count = 0;
-    lval *res = lval_str("", 0);
-    for (int i=0; i < n; i++) {
-        res->val.str = realloc(res->val.str, count + a[i]->count + 1);
-        memcpy((void*) res->val.str + count, a[i]->val.str, a[i]->count);
-        count += a[i]->count;
-        lval_del(a[i]);
-    }
-    res->count = count;
-    res->val.str[count] = '\0';
-    return res;
-}
-
 void lval_del(lval *v) {
     switch(v->type) {
         case LVAL_BOOL:
@@ -1036,11 +1022,18 @@ lval *builtin_concat(lenv *e, lval *a) {
         LASSERT(a, a->val.cell[i]->type == LVAL_STR,
                 "Builtin 'concat' take string arguments only.");
     }
-    lval *r = lval_str_concat(a->val.cell, a->count);
-    a->val.cell = NULL;
-    a->count = 0;
+    int count = 0;
+    lval *res = lval_str("", 0);
+    for (int i=0; i < a->count; i++) {
+        lval *v = a->val.cell[i];
+        res->val.str = realloc(res->val.str, count + v->count + 1);
+        memcpy((void*) res->val.str + count, v->val.str, v->count);
+        count += v->count;
+    }
+    res->count = count;
+    res->val.str[count] = '\0';
     lval_del(a);
-    return r;
+    return res;
 }
 
 void add_builtin(lenv *e, char *sym, lbuiltin bltn) {

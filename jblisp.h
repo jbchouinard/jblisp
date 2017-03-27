@@ -46,10 +46,10 @@ lval *lval_insert(lval*, lval*, int);
 lval *lval_take(lval*, int);
 lval *lval_copy(lval*);
 void lval_del(lval*);
+
 int lval_equal(lval*, lval*);
 int lval_is(lval*, lval*);
 int lval_is_true(lval*);
-lval *lval_str_concat(lval**, int);
 
 void lval_print(lval*);
 void lval_println(lval*);
