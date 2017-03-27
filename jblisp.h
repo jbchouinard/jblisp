@@ -3,7 +3,7 @@
 
 #include "mpc.h"
 
-#define VERSION "0.5.0"
+#define VERSION "0.5.1"
 
 extern mpc_parser_t *Boolean;
 extern mpc_parser_t *Number;
@@ -36,6 +36,7 @@ lval *lval_err(char*, ...);
 lval *lval_sexpr(void);
 lval *lval_qexpr(void);
 lval *lval_sym(char*);
+lval *lval_str(char*, int);
 lval *lval_builtin(lbuiltin);
 lval *lval_proc(void);
 
@@ -48,6 +49,7 @@ void lval_del(lval*);
 int lval_equal(lval*, lval*);
 int lval_is(lval*, lval*);
 int lval_is_true(lval*);
+lval *lval_str_concat(lval**, int);
 
 void lval_print(lval*);
 void lval_println(lval*);
@@ -88,6 +90,8 @@ lval *builtin_tail(lenv*, lval*);
 lval *builtin_init(lenv*, lval*);
 lval *builtin_last(lenv*, lval*);
 lval *builtin_nth(lenv*, lval*);
+
+lval *builtin_concat(lenv*, lval*);
 
 lval *lval_read(mpc_ast_t*);
 lval *lval_read_num(mpc_ast_t*);
