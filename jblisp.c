@@ -110,6 +110,21 @@ lenv *lenv_new(lenv *enc) {
     return e;
 }
 
+lenv *lenv_copy(lenv *e) {
+    lenv *n = malloc(sizeof(lenv));
+    n->encl = e->encl;
+    n->count = e->count;
+    n->size = e->count;
+    n->syms = malloc(n->size * sizeof(char*));
+    n->vals = malloc(n->size * sizeof(lval*));
+    for (int i=0; i < n->count; i++) {
+        n->syms[i] = malloc(strlen(e->syms[i])+1);
+        strcpy(n->syms[i], e->syms[i]);
+        n->vals[i] = lval_copy(e->vals[i]);
+    }
+    return n;
+}
+
 void lenv_del(lenv *e) {
     for (int i=0; i < e->count; i++) {
         free(e->syms[i]);
@@ -1151,8 +1166,9 @@ lval *lval_call(lenv *e, lproc *p, lval *args) {
     }
     // Evaluate
     lval *result;
+    lenv *evalenv = lenv_copy(p->env);
     while (p->body->count) {
-        result = lval_eval(p->env, lval_pop(p->body, 0));
+        result = lval_eval(evalenv, lval_pop(p->body, 0));
         if (result->type == LVAL_ERR) { break; }
     }
     // Cleanup

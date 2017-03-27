@@ -25,3 +25,12 @@
 (def {f} (\ {x} {(\ {y} {(+ x y)})}))
 (def {g} (f 1000))
 (assert (= 1112 (g 112)) "This should evaluate to 1112")
+(def {h} (f 100))
+(assert (= 1112 (g 112)) "This should still evaluate to 1112")
+(assert (= 212 (h 112)) "This should still evaluate to 212")
+
+(def {z} 100)
+(fun {f x} {(\ {y} {(+ x y z)})})
+(fun {g} {(def {z} 100)
+          (f 10)})
+(assert (= 111 ((g) 1)) "Closures are broken")
