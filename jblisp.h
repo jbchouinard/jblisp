@@ -3,16 +3,7 @@
 
 #include "mpc.h"
 
-#define VERSION "0.5.1"
-
-extern mpc_parser_t *Boolean;
-extern mpc_parser_t *Number;
-extern mpc_parser_t *Symbol;
-extern mpc_parser_t *String;
-extern mpc_parser_t *Sexpr;
-extern mpc_parser_t *Qexpr;
-extern mpc_parser_t *Expr;
-extern mpc_parser_t *JBLisp;
+#define VERSION "0.5.2"
 
 typedef struct _lval lval;
 typedef struct _lenv lenv;
@@ -103,6 +94,7 @@ lval *lval_call(lenv*, lproc*, lval*);
 void exec_line(lenv*, char*);
 void exec_file(lenv*, char*);
 void build_parser(void);
+void cleanup_parser(void);
 void add_builtins(lenv*);
 
 #endif

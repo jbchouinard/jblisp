@@ -39,6 +39,6 @@ int main(int argc, char **argv) {
         free(input);
     }
 
-    mpc_cleanup(8, Boolean, Number, Symbol, String, Sexpr, Qexpr, Expr, JBLisp);
+    cleanup_parser();
     return 0;
 }

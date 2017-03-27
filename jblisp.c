@@ -1,4 +1,3 @@
-#include <string.h>
 #include <math.h>
 
 #include "mpc.h"
@@ -25,17 +24,6 @@
         lval_del(args);                                                    \
         return err;                                                        \
     }
-
-// Parser def'n
-mpc_parser_t *Boolean;
-mpc_parser_t *Number;
-mpc_parser_t *Symbol;
-mpc_parser_t *Chars;
-mpc_parser_t *String;
-mpc_parser_t *Sexpr;
-mpc_parser_t *Qexpr;
-mpc_parser_t *Expr;
-mpc_parser_t *JBLisp;
 
 // JBLisp builtin types
 enum { LVAL_BOOL, LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM, LVAL_STR,
@@ -1173,6 +1161,46 @@ lval *lval_call(lenv *e, lproc *p, lval *args) {
     return result;
 }
 
+mpc_parser_t *Boolean;
+mpc_parser_t *Number;
+mpc_parser_t *Symbol;
+mpc_parser_t *Chars;
+mpc_parser_t *String;
+mpc_parser_t *Sexpr;
+mpc_parser_t *Qexpr;
+mpc_parser_t *Expr;
+mpc_parser_t *JBLisp;
+
+void build_parser() {
+    Boolean   = mpc_new("boolean");
+    Number    = mpc_new("number");
+    Symbol    = mpc_new("symbol");
+    String    = mpc_new("string");
+    Sexpr     = mpc_new("sexpr");
+    Qexpr     = mpc_new("qexpr");
+    Expr      = mpc_new("expr");
+    JBLisp    = mpc_new("jblisp");
+
+    mpca_lang(MPCA_LANG_DEFAULT,
+        "                                                                     \
+            boolean  : /(#t)|(#f)/ ;                                          \
+            number   : /((-?[0-9]*[.][0-9]+)|(-?[0-9]+[.]?))([eE]-?[0-9]+)?/ ;\
+            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&?\\^]+/ ;                 \
+            string   : /\"([^\\\"\\\\]|\\\\.)*\"/ ;                           \
+            sexpr    : '(' <expr>* ')' ;                                      \
+            qexpr    : '{' <expr>* '}' ;                                      \
+            expr     : <boolean > | <number> | <symbol> | <string> |          \
+                       <sexpr> | <qexpr> ;                                    \
+            jblisp   : /^/ <expr>* /$/ ;                                      \
+        ",
+        Boolean, Number, Symbol, String, Sexpr, Qexpr, Expr, JBLisp
+    );
+}
+
+void cleanup_parser() {
+    mpc_cleanup(8, Boolean, Number, Symbol, String, Sexpr, Qexpr, Expr, JBLisp);
+}
+
 void exec_file(lenv *e, char *filename) {
     mpc_result_t res;
 
@@ -1211,30 +1239,4 @@ void exec_line(lenv *e, char *input) {
         mpc_err_print(res.error);
         mpc_err_delete(res.error);
     }
-}
-
-void build_parser() {
-    Boolean   = mpc_new("boolean");
-    Number    = mpc_new("number");
-    Symbol    = mpc_new("symbol");
-    String    = mpc_new("string");
-    Sexpr     = mpc_new("sexpr");
-    Qexpr     = mpc_new("qexpr");
-    Expr      = mpc_new("expr");
-    JBLisp    = mpc_new("jblisp");
-
-    mpca_lang(MPCA_LANG_DEFAULT,
-        "                                                                     \
-            boolean  : /(#t)|(#f)/ ;                                          \
-            number   : /((-?[0-9]*[.][0-9]+)|(-?[0-9]+[.]?))([eE]-?[0-9]+)?/ ;\
-            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&?\\^]+/ ;                 \
-            string   : /\"([^\\\"\\\\]|\\\\.)*\"/ ;                           \
-            sexpr    : '(' <expr>* ')' ;                                      \
-            qexpr    : '{' <expr>* '}' ;                                      \
-            expr     : <boolean > | <number> | <symbol> | <string> |          \
-                       <sexpr> | <qexpr> ;                                    \
-            jblisp   : /^/ <expr>* /$/ ;                                      \
-        ",
-        Boolean, Number, Symbol, String, Sexpr, Qexpr, Expr, JBLisp
-    );
 }
