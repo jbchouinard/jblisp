@@ -1104,15 +1104,9 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
     // builtin or user-defined / lambda.
     lval *procval = lval_eval(e, lval_pop(v, 0));
 
-    lenv *env;
-    if (procval->type == LVAL_PROC) {
-        env = procval->val.proc->env;
-    } else {
-        env = e;
-    }
     // Evaluate arguments.
     for (int i=0; i < v->count; i++) {
-        v->val.cell[i] = lval_eval(env, v->val.cell[i]);
+        v->val.cell[i] = lval_eval(e, v->val.cell[i]);
         // Bail out if there is an error
         if (v->val.cell[i]->type == LVAL_ERR) {
             lval_del(procval);
@@ -1121,9 +1115,9 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
     }
     lval *result;
     if (procval->type == LVAL_BUILTIN) {
-        result = procval->val.builtin(env, v);
+        result = procval->val.builtin(e, v);
     } else if (procval->type == LVAL_PROC) {
-        result = lval_call(env, lproc_copy(procval->val.proc), v);
+        result = lval_call(e, lproc_copy(procval->val.proc), v);
     } else {
         result = lval_err(
             "Object of type '%s' is not applicable.",
