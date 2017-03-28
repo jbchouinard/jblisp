@@ -1195,6 +1195,7 @@ lval *lval_call(lenv *e, lproc *p, lval *args) {
     return result;
 }
 
+mpc_parser_t *Comment;
 mpc_parser_t *Boolean;
 mpc_parser_t *Number;
 mpc_parser_t *Symbol;
@@ -1206,6 +1207,7 @@ mpc_parser_t *Expr;
 mpc_parser_t *JBLisp;
 
 void build_parser() {
+    Comment   = mpc_new("comment");
     Boolean   = mpc_new("boolean");
     Number    = mpc_new("number");
     Symbol    = mpc_new("symbol");
@@ -1217,6 +1219,7 @@ void build_parser() {
 
     mpca_lang(MPCA_LANG_DEFAULT,
         "                                                                     \
+            comment  : /;[^\\r\\n]*/ ;                                        \
             boolean  : /(#t)|(#f)/ ;                                          \
             number   : /((-?[0-9]*[.][0-9]+)|(-?[0-9]+[.]?))([eE]-?[0-9]+)?/ ;\
             symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&?\\^]+/ ;                 \
@@ -1227,12 +1230,14 @@ void build_parser() {
                        <sexpr> | <qexpr> ;                                    \
             jblisp   : /^/ <expr>* /$/ ;                                      \
         ",
-        Boolean, Number, Symbol, String, Sexpr, Qexpr, Expr, JBLisp
+        Comment, Boolean, Number, Symbol, String, Sexpr, Qexpr, Expr, JBLisp
     );
 }
 
 void cleanup_parser() {
-    mpc_cleanup(8, Boolean, Number, Symbol, String, Sexpr, Qexpr, Expr, JBLisp);
+    mpc_cleanup(9,
+        Comment, Boolean, Number, Symbol, String, Sexpr, Qexpr, Expr, JBLisp
+    );
 }
 
 void exec_file(lenv *e, char *filename) {
