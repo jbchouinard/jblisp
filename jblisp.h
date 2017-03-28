@@ -3,7 +3,7 @@
 
 #include "mpc.h"
 
-#define VERSION "0.5.4"
+#define VERSION "0.6.0"
 
 typedef struct _lval lval;
 typedef struct _lenv lenv;
