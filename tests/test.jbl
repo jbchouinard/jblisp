@@ -1,11 +1,13 @@
 (fun {assert-not pred n} {(assert (not pred) n)})
 
+; Identity tests
 (assert (equal? 1 1) "1 is not equal to 1")
 (assert (equal? 1.0 1.0) "1.0 is not equal to 1.0")
 (assert (equal? () ()) "Empty s-expr not equal to itself")
 (assert (equal? {} {}) "Empty q-expr not equal to itself")
 (assert (equal? {1 2} {1 2}) "q-expr {1 2} not equal to itself")
 
+; Arithmetic tests
 (assert (= 5 (+ 1 4)) "Addition is broken")
 (assert (= 1 (- 8 7)) "Subtraction is broken")
 (assert (equal? (not #t) #f) "Not true should be false")
@@ -17,6 +19,7 @@
 (assert (<= 25 25) "25 should be <= 25")
 (assert (>= 25 25) "25 should be >= 25")
 
+; Lambda tests
 (def {x} 4)
 (def {y} 7)
 (assert (= (+ x y) 11) "Addition of vars is broken")
@@ -29,12 +32,14 @@
 (assert (= 1112 (g 112)) "This should still evaluate to 1112")
 (assert (= 212 (h 112)) "This should still evaluate to 212")
 
+; Closure tests
 (def {z} 100)
 (fun {f x} {(\ {y} {(+ x y z)})})
 (fun {g} {(def {z} 100)
           (f 10)})
 (assert (= 111 ((g) 1)) "Closures are broken")
 
+; String tests
 (assert (equal? "foo" "foo") "Strings of same value should be equal")
 (assert-not (equal? "foo" "bar") "Strings of different values should NOT be equal")
 (assert (equal? "foobar" (concat "foo" "bar")) "Error in string concatenation")
