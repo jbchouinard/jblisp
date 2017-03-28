@@ -994,10 +994,6 @@ lval *builtin_lambda(lenv *e, lval *a) {
         }
     }
     lval *q = lval_take(a, 0);
-    if (q->count == 0) {
-        return lval_err("Invalid lambda expression - empty procedure body");
-    }
-
     lval *v = lval_proc();
     v->val.proc->env = lenv_new(e);
     v->val.proc->params = syms;
