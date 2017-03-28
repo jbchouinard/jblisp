@@ -477,6 +477,8 @@ lval *lval_read(mpc_ast_t *ast) {
             continue;
         if (strcmp(ast->children[i]->tag, "regex") == 0)
             continue;
+        if (strstr(ast->children[i]->tag, "comment"))
+            continue;
         x = lval_add(x, lval_read(ast->children[i]));
     }
     return x;
@@ -1227,7 +1229,7 @@ void build_parser() {
             sexpr    : '(' <expr>* ')' ;                                      \
             qexpr    : '{' <expr>* '}' ;                                      \
             expr     : <boolean > | <number> | <symbol> | <string> |          \
-                       <sexpr> | <qexpr> ;                                    \
+                       <sexpr> | <qexpr> | <comment> ;                        \
             jblisp   : /^/ <expr>* /$/ ;                                      \
         ",
         Comment, Boolean, Number, Symbol, String, Sexpr, Qexpr, Expr, JBLisp
