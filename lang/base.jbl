@@ -1,9 +1,13 @@
+(def {nil} ())
+(def {else} #t)
+
+(fun {nil? x} {(equal? nil x)})
+(fun {empty? lst} {(= 0 (len lst))})
+
 (fun {> x y} {(< y x)})
 (fun {>= x y} {(not (< x y))})
 (fun {<= x y} {(not (< y x))})
 (fun {!= x y} {(not (= y x))})
-
-(fun {empty? lst} {(= 0 (len lst))})
 
 (fun {foldl op init lst} {
     (if (empty? lst)
@@ -12,7 +16,10 @@
 
 (fun {fold op init lst} {
    (fun {fold-rec rest} {
-       (if (empty? (tail rest))
-           {(head rest)}
+       (if (empty? rest)
+           {init}
            {(op (head rest) (fold-rec (tail rest)))})})
    (fold-rec lst)})
+
+(fun {map op lst}
+     {(fold (\ {x acc} {(cons (op x) acc)}) {} lst)})
