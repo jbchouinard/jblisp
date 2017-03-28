@@ -1,5 +1,5 @@
 (fun {assert-not pred msg} {(assert (not pred) msg)})
-(fun {assert-equal v1 v2 msg} {(assert-equal v1 v2 msg)})
+(fun {assert-equal v1 v2 msg} {(assert (equal? v1 v2) msg)})
 
 ; Eval tests
 1
@@ -21,8 +21,8 @@
 ; Arithmetic tests
 (assert (= 5 (+ 1 4)) "Addition is broken")
 (assert (= 1 (- 8 7)) "Subtraction is broken")
-(assert-equal (not #t #f) "Not true should be false")
-(assert-equal (not #f #t) "Not false should be true")
+(assert-equal (not #t) #f "Not true should be false")
+(assert-equal (not #f) #t "Not false should be true")
 (assert (< 8 10) "8 should be less than 10")
 (assert-not (< 100.5 10) "100.5 should not be less than 10")
 (assert (> 100.5 10) "100.5 should be greater than 10")
@@ -78,7 +78,7 @@
     "IF: Should evaluate to 1.")
 (assert-equal x "foo"
     "IF: Should evaluate 1st statement only")
-(assert-equal? 7 (if #f {(def {x} "bar")} {(+ 3 4)})
+(assert-equal 7 (if #f {(def {x} "bar")} {(+ 3 4)})
     "IF: Should evaluate to 3+4.")
 (assert-equal x "foo"
     "IF: Should evaluate 2nd statement only")
