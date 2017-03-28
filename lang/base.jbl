@@ -7,3 +7,17 @@
 (fun {>= x y} {(not (< x y))})
 (fun {<= x y} {(not (< y x))})
 (fun {!= x y} {(not (= y x))})
+
+(fun {empty? lst} {(= 0 (len lst))})
+
+(fun {foldl op init lst} {
+    (if (empty? lst)
+        {init}
+        {(fold op (op init (head lst)) (tail lst))})})
+
+(fun {fold op init lst} {
+    (fun {fold-rec rest} {
+        (if (empty? (tail rest))
+            {(head rest)}
+            {(op (head rest) (fold-rec (tail rest)))})})
+    (fold-rec lst)})
