@@ -1120,6 +1120,28 @@ lval *builtin_if(lenv *e, lval *a) {
     return lval_eval_qexpr(e, expr);
 }
 
+lval *builtin_cond(lenv *e, lval *a) {
+    for (int i=0; i < a->count; i++) {
+        if (a->val.cell[i]->type != LVAL_QEXPR) {
+            lval_del(a);
+            return lval_err("'cond' expected q-expression arguments only");
+        }
+    }
+    while (a->count) {
+        lval *cond = lval_pop(a, 0);
+        lval *pred = lval_pop(cond, 0);
+        if (lval_is_true(pred)) {
+            lval_del(pred);
+            lval_del(a);
+            return lval_eval_qexpr(e, cond);
+        }
+        lval_del(cond);
+        lval_del(pred);
+    }
+    lval_del(a);
+    return lval_sexpr();
+}
+
 void add_builtin(lenv *e, char *sym, lbuiltin bltn) {
     lval *v = lval_builtin(bltn);
     lenv_put(e, sym, v);
@@ -1137,6 +1159,7 @@ void add_builtins(lenv *e) {
     add_builtin(e, "error", builtin_error);
     add_builtin(e, "assert", builtin_assert);
     add_builtin(e, "if", builtin_if);
+    add_builtin(e, "cond", builtin_cond);
 
     // List procedures
     add_builtin(e, "list", builtin_list);
