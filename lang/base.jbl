@@ -1,8 +1,3 @@
-(def {fun}
-    (\ {sig body}
-       {(def* (list (head sig))
-              (\ (tail sig) body))}))
-
 (fun {> x y} {(< y x)})
 (fun {>= x y} {(not (< x y))})
 (fun {<= x y} {(not (< y x))})
@@ -16,8 +11,8 @@
         {(fold op (op init (head lst)) (tail lst))})})
 
 (fun {fold op init lst} {
-    (fun {fold-rec rest} {
-        (if (empty? (tail rest))
-            {(head rest)}
-            {(op (head rest) (fold-rec (tail rest)))})})
-    (fold-rec lst)})
+   (fun {fold-rec rest} {
+       (if (empty? (tail rest))
+           {(head rest)}
+           {(op (head rest) (fold-rec (tail rest)))})})
+   (fold-rec lst)})
