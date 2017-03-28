@@ -15,3 +15,11 @@ Raise an error of type `type`:
 
 Raise an error iff evaluating `predicate` does *not* raise an error of type `type`.
 (assert-error type  msg v1 v2 ...)
+
+## Fix closures
+
+Closures are still not working properly.
+
+We shouldnt need to use def\* in the definiton of fun.
+
+The latest tests added are failing.
