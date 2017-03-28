@@ -93,6 +93,7 @@ lval *lval_eval_qexpr(lenv*, lval*);
 lval *lval_eval_sexpr(lenv*, lval*);
 lval *lval_call(lenv*, lval*, lval*);
 
+lval *load_file(lenv*, char*);
 void exec_line(lenv*, char*);
 void exec_file(lenv*, char*);
 void build_parser(void);

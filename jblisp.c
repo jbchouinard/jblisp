@@ -847,6 +847,15 @@ lval *builtin_eval(lenv *e, lval *a) {
     return lval_eval(e, x);
 }
 
+lval *builtin_load(lenv *e, lval *a) {
+    LASSERT_ARGC("load", a, 1);
+    LASSERT_ARGT("load", a, 0, LVAL_STR);
+
+    lval *v = load_file(e, a->val.cell[0]->val.str);
+    lval_del(a);
+    return v;
+}
+
 lval *builtin_join(lenv *e, lval *a) {
     LASSERT(a, a->count != 0,
         "Procedure 'join' takes at least 1 argument.");
@@ -1149,6 +1158,7 @@ void add_builtin(lenv *e, char *sym, lbuiltin bltn) {
 }
 
 void add_builtins(lenv *e) {
+    add_builtin(e, "load", builtin_load);
     add_builtin(e, "def", builtin_def);
     add_builtin(e, "def*", builtin_def_global);
     add_builtin(e, "fun", builtin_fun);
@@ -1348,26 +1358,50 @@ void cleanup_parser() {
     );
 }
 
-void exec_file(lenv *e, char *filename) {
-    mpc_result_t res;
+int INDENT = 0;
 
+void load_print_indent() {
+    for (int i=0; i < INDENT; i++) {
+        putchar(' ');
+        putchar(' ');
+    }
+}
+
+lval *load_file(lenv *e, char *filename) {
+    load_print_indent();
     printf("Loading file '%s'...\n", filename);
+    INDENT++;
+    mpc_result_t res;
+    lval *x = NULL;
     if (mpc_parse_contents(filename, JBLisp, &res)) {
         lval *prog = lval_read(res.output);
         mpc_ast_delete(res.output);
         while (prog->count) {
-            lval *x = lval_eval(e, lval_pop(prog, 0));
+            if (x != NULL) { lval_del(x); }
+            x = lval_eval(e, lval_pop(prog, 0));
             if (x->type == LVAL_ERR) {
-                lval_println(x);
+                lval_del(prog);
+                return x;
             }
-            lval_del(x);
         }
         lval_del(prog);
     } else {
         mpc_err_print(res.error);
         mpc_err_delete(res.error);
+        return lval_err("parser error");
     }
-    puts("done.");
+    INDENT--;
+    load_print_indent();
+    puts("done");
+    return x;
+}
+
+void exec_file(lenv *e, char *filename) {
+    lval *x = load_file(e, filename);
+    if (x->type == LVAL_ERR) {
+        lval_println(x);
+    }
+    lval_del(x);
 }
 
 void exec_line(lenv *e, char *input) {
