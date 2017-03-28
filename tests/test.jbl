@@ -1,5 +1,15 @@
 (fun {assert-not pred n} {(assert (not pred) n)})
 
+; Eval tests
+1
+1.23
+{}
+{{}}
+{{1 2 3} {3 4 5}}
+"foo"
+#f
+#t
+
 ; Identity tests
 (assert (equal? 1 1) "1 is not equal to 1")
 (assert (equal? 1.0 1.0) "1.0 is not equal to 1.0")

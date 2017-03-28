@@ -495,25 +495,24 @@ char *strencl(char *s, size_t n, char open, char close) {
 }
 
 lval *lval_repr_expr(lval *v, char open, char close) {
-    if (v->count == 0) {
-        char r[3] = {open, close, '\0'};
-        return lval_str(r, 2);
-    }
     char *repr = malloc(3);
     int count = 1;
+    if (v->count == 0) { count = 2; }
     repr[0] = open;
-    for (int i=0; i < v->count; i++) {
-        lval *nxt = lval_repr(v->val.cell[i]);
+    while (v->count) {
+        lval *nxt = lval_repr(lval_pop(v, 0));
         int newcount = count + nxt->count + 1; // +1 for space
         repr = realloc(repr, newcount + 1);
         memcpy(repr+count, nxt->val.str, nxt->count);
         count = newcount;
         repr[count-1] = ' ';
+        lval_del(nxt);
     }
     repr[count-1] = close;
     repr[count] = '\0';
     lval *res = lval_str(repr, count);
     free(repr);
+    lval_del(v);
     return res;
 }
 
@@ -573,10 +572,12 @@ lval *lval_repr(lval *v) {
             len = snprintf(repr, len+1, "<error: %s>", v->val.str);
             break;
         default:
+            lval_del(v);
             return lval_err("Error: LVAL has invalid type.");
     }
     lval *res = lval_str(repr, len);
     free(repr);
+    lval_del(v);
     return res;
 }
 
@@ -1158,6 +1159,7 @@ lval *lval_eval_qexpr(lenv *e, lval *body) {
         result = lval_eval(e, lval_pop(body, 0));
         if (result->type == LVAL_ERR) { break; }
     }
+    lval_del(body);
     return result;
 }
 
@@ -1181,19 +1183,21 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
     lval *result;
     if (procval->type == LVAL_BUILTIN) {
         result = procval->val.builtin(e, v);
+        lval_del(procval);
     } else if (procval->type == LVAL_PROC) {
-        result = lval_call(e, procval->val.proc, v);
+        result = lval_call(e, procval, v);
     } else {
         result = lval_err(
             "Object of type '%s' is not applicable.",
             TYPE_NAMES[procval->type]);
+        lval_del(procval);
         lval_del(v);
     }
-    lval_del(procval);
     return result;
 }
 
-lval *lval_call(lenv *e, lproc *p, lval *args) {
+lval *lval_call(lenv *e, lval *proc, lval *args) {
+    lproc *p = proc->val.proc;
     // Set up procedure's env
     while (p->params->count && args->count) {
         lval *par = lval_pop(p->params, 0);
@@ -1203,6 +1207,7 @@ lval *lval_call(lenv *e, lproc *p, lval *args) {
         if (strcmp(par->val.str, "&") == 0) {
             lval_del(par);
             if (p->params->count != 1) {
+                lval_del(proc);
                 lval_del(args);
                 return lval_err("Expected a single symbol after '&'.");
             }
@@ -1218,12 +1223,16 @@ lval *lval_call(lenv *e, lproc *p, lval *args) {
         lval_del(arg);
     }
     if (p->params->count || args->count) {
+        lval_del(proc);
         lval_del(args);
         return lval_err("Wrong number of arguments to lambda.");
     }
-    lval_del(args);
     // Evaluate body
-    return lval_eval_qexpr(lenv_copy(p->env), p->body);
+    lval *res = lval_eval_qexpr(lenv_copy(p->env), p->body);
+    p->body = NULL;
+    lval_del(proc);
+    lval_del(args);
+    return res;
 }
 
 mpc_parser_t *Comment;
@@ -1302,7 +1311,6 @@ void exec_line(lenv *e, char *input) {
         while (line->count) {
             lval *x = lval_eval(e, lval_pop(line, 0));
             lval_println(x);
-            lval_del(x);
         }
         lval_del(line);
     } else {
