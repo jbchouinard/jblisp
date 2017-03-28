@@ -229,6 +229,7 @@ lval *lval_str(char *s, int count) {
     v->val.str = malloc(count + 1);
     v->count = count;
     strncpy(v->val.str, s, count);
+    v->val.str[count] = '\0';
     return v;
 }
 
@@ -481,60 +482,93 @@ lval *lval_read(mpc_ast_t *ast) {
     return x;
 }
 
-void lval_print_expr(lval *v, char open, char close) {
-    putchar(open);
-    for (int i=0; i < v->count; i++) {
-        lval_print(v->val.cell[i]);
-        if (i != v->count-1)
-            putchar(' ');
-    }
-    putchar(close);
+char *strencl(char *s, size_t n, char open, char close) {
+    char *r = malloc(n+3);
+    memcpy((void*) r+1, (void*) s, n);
+    r[0] = open;
+    r[n+1] = close;
+    r[n+2] = '\0';
+    free(s);
+    return r;
 }
 
-void lval_print_str(lval *v) {
-    char *escaped = malloc(v->count + 1);
-    strcpy(escaped, v->val.str);
-    escaped = mpcf_escape(escaped);
-    printf("\"%s\"", escaped);
-    free(escaped);
+lval *lval_repr_expr(lval *v, char open, char close) {
+    return v;
+}
+
+lval *lval_repr(lval *v) {
+    char *repr;
+    size_t len;
+    switch (v->type) {
+        case LVAL_BOOL:
+            repr = malloc(3);
+            strcpy(repr, v->val.bool ? "#t" : "#f");
+            len = 2;
+            break;
+        case LVAL_LNG:
+            repr = malloc(1);
+            len = snprintf(repr, 1, "%ld", v->val.lng);
+            repr = realloc(repr, len+1);
+            len = snprintf(repr, len+1, "%ld", v->val.lng);
+            break;
+        case LVAL_DBL:
+            repr = malloc(1);
+            len = snprintf(repr, 1, "%0.30g", v->val.dbl);
+            repr = realloc(repr, len+1);
+            len = snprintf(repr, len+1, "%0.30g", v->val.dbl);
+            break;
+        case LVAL_SYM:
+            len = v->count;
+            repr = malloc(len + 1);
+            strcpy(repr, v->val.str);
+            break;
+        case LVAL_STR:
+            repr = malloc(v->count+1);
+            memcpy((void*) repr, (void*) v->val.str, v->count+1);
+            repr = mpcf_escape(repr);
+            len = strlen(repr) + 2;
+            repr = strencl(repr, len-2, '\"', '\"');
+            break;
+        case LVAL_SEXPR:
+            len = 7;
+            repr = malloc(7);
+            strcpy(repr, "<sexpr>");
+            break;
+        case LVAL_QEXPR:
+            len = 7;
+            repr = malloc(len+1);
+            strcpy(repr, "<qexpr>");
+            break;
+        case LVAL_BUILTIN:
+            repr = malloc(1);
+            len = snprintf(repr, 1, "<builtin procedure at %p>", v->val.builtin);
+            repr = realloc(repr, len+1);
+            len = snprintf(repr, len+1, "<builtin procedure at %p>", v->val.builtin);
+            break;
+        case LVAL_PROC:
+            repr = malloc(1);
+            len = snprintf(repr, 1, "<procedure at %p>", v->val.proc);
+            repr = realloc(repr, len+1);
+            len = snprintf(repr, len+1, "<procedure at %p>", v->val.proc);
+            break;
+        case LVAL_ERR:
+            repr = malloc(1);
+            len = snprintf(repr, 1, "<error: %s>", v->val.str);
+            repr = realloc(repr, len+1);
+            len = snprintf(repr, len+1, "<error: %s>", v->val.str);
+            break;
+        default:
+            return lval_err("Error: LVAL has invalid type.");
+    }
+    lval *res = lval_str(repr, len);
+    free(repr);
+    return res;
 }
 
 void lval_print(lval *v) {
-    switch (v->type) {
-        case LVAL_BOOL:
-            printf(v->val.bool ? "#t" : "#f");
-            break;
-        case LVAL_LNG:
-            printf("%li", v->val.lng);
-            break;
-        case LVAL_DBL:
-            printf("%lf", v->val.dbl);
-            break;
-        case LVAL_SYM:
-            printf("%s", v->val.str);
-            break;
-        case LVAL_STR:
-            lval_print_str(v);
-            break;
-        case LVAL_SEXPR:
-            lval_print_expr(v, '(', ')');
-            break;
-        case LVAL_QEXPR:
-            lval_print_expr(v, '{', '}');
-            break;
-        case LVAL_BUILTIN:
-            printf("<builtin>");
-            break;
-        case LVAL_PROC:
-            printf("<procedure>");
-            break;
-        case LVAL_ERR:
-            printf("Error: %s", v->val.str);
-            break;
-        default:
-            printf("Error: LVAL has invalid type.");
-            break;
-    }
+    lval* repr = lval_repr(v);
+    puts(repr->val.str);
+    lval_del(repr);
 }
 
 void lval_println(lval *v) {
