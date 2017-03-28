@@ -1186,6 +1186,9 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
         lval_del(procval);
     } else if (procval->type == LVAL_PROC) {
         result = lval_call(e, procval, v);
+    } else if (procval->type == LVAL_ERR) {
+        lval_del(v);
+        return procval;
     } else {
         result = lval_err(
             "Object of type '%s' is not applicable.",
