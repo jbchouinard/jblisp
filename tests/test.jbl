@@ -82,3 +82,9 @@
     "IF: Should evaluate to 3+4.")
 (assert-equal x "foo"
     "IF: Should evaluate 2nd statement only")
+(assert-equal "foo" (cond {#t "foo"} {#t "bar"})
+    "COND: Should evaluate to 'foo'")
+(assert-equal "bar" (cond {#f "bar"} {#t "bar"})
+    "COND: Should evaluate to 'foo'")
+(assert-equal "baz" (cond {#f "foo"} {#f "bar"} {esle "baz"})
+    "COND: Should evaluate to 'baz'")
