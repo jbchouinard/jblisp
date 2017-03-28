@@ -51,7 +51,7 @@ struct _lval {
 struct _lproc {
     lval *params;
     lval *body;
-    lenv *env;
+    lenv *closure;
 };
 
 struct _lenv {
@@ -66,13 +66,13 @@ lproc *lproc_new() {
     lproc *p = malloc(sizeof(lproc));
     p->params = NULL;
     p->body = NULL;
-    p->env = NULL;
+    p->closure = NULL;
     return p;
 }
 
 lproc *lproc_copy(lproc *p) {
     lproc *v = malloc(sizeof(lproc));
-    v->env = p->env;
+    v->closure = p->closure;
     v->params = lval_copy(p->params);
     v->body = lval_copy(p->body);
     return v;
@@ -1009,7 +1009,7 @@ lval *builtin_lambda(lenv *e, lval *a) {
     }
     lval *q = lval_take(a, 0);
     lval *v = lval_proc();
-    v->val.proc->env = lenv_new(e);
+    v->val.proc->closure = e;
     v->val.proc->params = syms;
     v->val.proc->body = q;
     return v;
@@ -1167,8 +1167,8 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
     // Special case: empty sexpr evaluates to itself
     if (v->count == 0) { return v; }
 
-    // We expect the first element of the sexpr to be a procedure, either
-    // builtin or user-defined / lambda.
+    // We expect the first element of the sexpr to evaluate to a procedure,
+    // either builtin or user-defined (lambda).
     lval *procval = lval_eval(e, lval_pop(v, 0));
 
     // Evaluate arguments.
@@ -1180,6 +1180,7 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
             return lval_take(v, i);
         }
     }
+
     lval *result;
     if (procval->type == LVAL_BUILTIN) {
         result = procval->val.builtin(e, v);
@@ -1200,8 +1201,10 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
 }
 
 lval *lval_call(lenv *e, lval *proc, lval *args) {
+    // Set up closure
     lproc *p = proc->val.proc;
-    // Set up procedure's env
+    lenv *closure = lenv_new(p->closure);
+    // Add formal parameters to closure
     while (p->params->count && args->count) {
         lval *par = lval_pop(p->params, 0);
         lval *arg;
@@ -1212,6 +1215,7 @@ lval *lval_call(lenv *e, lval *proc, lval *args) {
             if (p->params->count != 1) {
                 lval_del(proc);
                 lval_del(args);
+                lenv_del(closure);
                 return lval_err("Expected a single symbol after '&'.");
             }
             par = lval_pop(p->params, 0);
@@ -1221,17 +1225,18 @@ lval *lval_call(lenv *e, lval *proc, lval *args) {
         } else {
             arg = lval_pop(args, 0);
         }
-        lenv_put(p->env, par->val.str, arg);
+        lenv_put(closure, par->val.str, arg);
         lval_del(par);
         lval_del(arg);
     }
     if (p->params->count || args->count) {
         lval_del(proc);
         lval_del(args);
+        lenv_del(closure);
         return lval_err("Wrong number of arguments to lambda.");
     }
     // Evaluate body
-    lval *res = lval_eval_qexpr(lenv_copy(p->env), p->body);
+    lval *res = lval_eval_qexpr(closure, p->body);
     p->body = NULL;
     lval_del(proc);
     lval_del(args);
