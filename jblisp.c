@@ -993,6 +993,42 @@ lval *builtin_def_global(lenv *e, lval *a) {
     return builtin_def(global, a);
 }
 
+// Define a procedure like (fun {f x y} {(+ x y)})
+// which is equivalent to (def {f} (\ {x y} {(+ x y)}))
+// but cannot be implemented correctly in jblisp given
+// how lexical scoping is currenctly implemented
+lval *builtin_fun(lenv *e, lval *a) {
+    LASSERT_ARGC("fun", a, 2);
+    LASSERT_ARGT("fun", a, 0, LVAL_QEXPR);
+    LASSERT_ARGT("fun", a, 1, LVAL_QEXPR);
+
+    lval *syms = lval_pop(a, 0);
+    for (int i=0; i < syms->count; i++) {
+        if (syms->val.cell[i]->type != LVAL_SYM) {
+            lval_del(syms);
+            lval_del(a);
+            return lval_err("'fun' expected a list of symbols as first arg");
+        }
+    }
+    lval *adef = lval_sexpr();
+    lval *defsym = lval_qexpr();
+    lval_add(defsym, lval_pop(syms, 0));
+    lval_add(adef, defsym);
+
+    lval *alambda = lval_sexpr();
+    lval_add(alambda, syms);
+    lval_add(alambda, lval_take(a, 0));  // procedure body
+
+    lval* lambda = builtin_lambda(e, alambda);
+    if (lambda->type == LVAL_ERR) {
+        lval_del(adef);
+        return lambda;
+    }
+
+    lval_add(adef, lambda);
+    return builtin_def(e, adef);
+}
+
 lval *builtin_lambda(lenv *e, lval *a) {
     LASSERT_ARGC("lambda", a, 2);
     LASSERT_ARGT("lambda", a, 0, LVAL_QEXPR);
@@ -1093,6 +1129,7 @@ void add_builtin(lenv *e, char *sym, lbuiltin bltn) {
 void add_builtins(lenv *e) {
     add_builtin(e, "def", builtin_def);
     add_builtin(e, "def*", builtin_def_global);
+    add_builtin(e, "fun", builtin_fun);
     add_builtin(e, "equal?", builtin_equal);
     add_builtin(e, "is?", builtin_is);
     add_builtin(e, "\\", builtin_lambda);
