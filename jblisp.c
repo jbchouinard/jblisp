@@ -1060,6 +1060,20 @@ lval *builtin_concat(lenv *e, lval *a) {
     return res;
 }
 
+lval *builtin_if(lenv *e, lval *a) {
+    LASSERT_ARGC("if", a, 3);
+    LASSERT_ARGT("if", a, 1, LVAL_QEXPR);
+    LASSERT_ARGT("if", a, 2, LVAL_QEXPR);
+
+    lval *expr;
+    if (lval_is_true(a->val.cell[0])) {
+        expr = lval_take(a, 1);
+    } else {
+        expr = lval_take(a, 2);
+    }
+    return lval_eval_qexpr(e, expr);
+}
+
 void add_builtin(lenv *e, char *sym, lbuiltin bltn) {
     lval *v = lval_builtin(bltn);
     lenv_put(e, sym, v);
@@ -1075,6 +1089,7 @@ void add_builtins(lenv *e) {
     add_builtin(e, "apply", builtin_apply);
     add_builtin(e, "error", builtin_error);
     add_builtin(e, "assert", builtin_assert);
+    add_builtin(e, "if", builtin_if);
 
     // List procedures
     add_builtin(e, "list", builtin_list);
@@ -1122,6 +1137,19 @@ lval *lval_eval(lenv *e, lval *v) {
             break;
     }
     return x;
+}
+
+// Evaluate each statement in a Q-expression
+// Returns result of the last expression.
+lval *lval_eval_qexpr(lenv *e, lval *body) {
+    lval* result = NULL;
+    if (body->count == 0) { result = lval_sexpr(); }
+    while (body->count) {
+        if (result != NULL) { lval_del(result); }
+        result = lval_eval(e, lval_pop(body, 0));
+        if (result->type == LVAL_ERR) { break; }
+    }
+    return result;
 }
 
 lval *lval_eval_sexpr(lenv *e, lval *v) {
@@ -1184,17 +1212,9 @@ lval *lval_call(lenv *e, lproc *p, lval *args) {
         lval_del(args);
         return lval_err("Wrong number of arguments to lambda.");
     }
-    // Evaluate
-    lval *result = NULL;
-    lenv *evalenv = lenv_copy(p->env);
-    while (p->body->count) {
-        if (result != NULL) { lval_del(result); }
-        result = lval_eval(evalenv, lval_pop(p->body, 0));
-        if (result->type == LVAL_ERR) { break; }
-    }
-    // Cleanup
     lval_del(args);
-    return result;
+    // Evaluate body
+    return lval_eval_qexpr(lenv_copy(p->env), p->body);
 }
 
 mpc_parser_t *Comment;

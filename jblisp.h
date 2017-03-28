@@ -3,7 +3,7 @@
 
 #include "mpc.h"
 
-#define VERSION "0.5.3"
+#define VERSION "0.5.4"
 
 typedef struct _lval lval;
 typedef struct _lenv lenv;
@@ -88,6 +88,7 @@ lval *lval_read(mpc_ast_t*);
 lval *lval_read_num(mpc_ast_t*);
 
 lval *lval_eval(lenv*, lval*);
+lval *lval_eval_qexpr(lenv*, lval*);
 lval *lval_eval_sexpr(lenv*, lval*);
 lval *lval_call(lenv*, lproc*, lval*);
 
