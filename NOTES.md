@@ -86,7 +86,7 @@ BUT:
 
 What should (g 20) return? 34 or 214?
 
-In Scheme the result is 34. On reflection it makes sense. That's the point
+In Scheme the result is 214. On reflection it makes sense. That's the point
 of lexical scoping; we take the binding z close to where the procedure is
 declared.
 
@@ -120,4 +120,5 @@ For all this to be true, the following must happen:
 - In that case it makes sense to only save a ref to the exec env, and create
   a env with it as parent instead of repeatedly taking copies of an empty env
   (it's a fairly minor difference but makes thinks conceptually easier - it
-  makes it clear lambda values don't carry around a personal env with state).
+  makes it clear lambda values don't carry around a personal env with state,
+  but rather a ref to a closure).
