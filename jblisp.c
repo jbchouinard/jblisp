@@ -495,7 +495,26 @@ char *strencl(char *s, size_t n, char open, char close) {
 }
 
 lval *lval_repr_expr(lval *v, char open, char close) {
-    return v;
+    if (v->count == 0) {
+        char r[3] = {open, close, '\0'};
+        return lval_str(r, 2);
+    }
+    char *repr = malloc(3);
+    int count = 1;
+    repr[0] = open;
+    for (int i=0; i < v->count; i++) {
+        lval *nxt = lval_repr(v->val.cell[i]);
+        int newcount = count + nxt->count + 1; // +1 for space
+        repr = realloc(repr, newcount + 1);
+        memcpy(repr+count, nxt->val.str, nxt->count);
+        count = newcount;
+        repr[count-1] = ' ';
+    }
+    repr[count-1] = close;
+    repr[count] = '\0';
+    lval *res = lval_str(repr, count);
+    free(repr);
+    return res;
 }
 
 lval *lval_repr(lval *v) {
@@ -532,15 +551,9 @@ lval *lval_repr(lval *v) {
             repr = strencl(repr, len-2, '\"', '\"');
             break;
         case LVAL_SEXPR:
-            len = 7;
-            repr = malloc(7);
-            strcpy(repr, "<sexpr>");
-            break;
+            return lval_repr_expr(v, '(', ')');
         case LVAL_QEXPR:
-            len = 7;
-            repr = malloc(len+1);
-            strcpy(repr, "<qexpr>");
-            break;
+            return lval_repr_expr(v, '{', '}');
         case LVAL_BUILTIN:
             repr = malloc(1);
             len = snprintf(repr, 1, "<builtin procedure at %p>", v->val.builtin);

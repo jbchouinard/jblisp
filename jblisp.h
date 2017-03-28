@@ -42,6 +42,7 @@ int lval_equal(lval*, lval*);
 int lval_is(lval*, lval*);
 int lval_is_true(lval*);
 
+lval *lval_repr(lval*);
 void lval_print(lval*);
 void lval_println(lval*);
 void lval_print_expr(lval*, char, char);
