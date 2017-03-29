@@ -1,0 +1,35 @@
+(fun {f x} {(list x x)})
+
+(def {a} {1 2 3 4})
+
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+(def {a} (f a))
+
+; Tests results - virtual memory usage
+; ----------------------
+; | Revision | VSZ     |
+; ----------------------
+; | 167d2aaa | 3351984 |
+; ----------------------

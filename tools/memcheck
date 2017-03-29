@@ -1,0 +1,5 @@
+#!/bin/sh
+while true; do
+ps -C jblisp -o pid=,%mem=,vsz= >> memcheck.log
+sleep 1
+done
