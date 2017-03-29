@@ -830,6 +830,18 @@ lval *builtin_tail(lenv *e, lval *a) {
     return v;
 }
 
+lval *builtin_set_head(lenv *e, lval *a) {
+    LASSERT_ARGC("set-head!", a, 2)
+    LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
+        "Procedure 'tail' expected a Q expression as argument 2.");
+
+    lval *lst = lval_pop(a, 0);
+    lval *v = lval_take(a, 0);
+    lval_del(lst->val.cell[0]);
+    lst->val.cell[0] = v;
+    return lst;
+}
+
 lval *builtin_list(lenv *e, lval *a) {
     LASSERT(a, a->type == LVAL_SEXPR,
         "Procedure 'list' expected an S expression");
@@ -923,11 +935,83 @@ lval *builtin_equal(lenv *e, lval *a) {
 }
 
 lval *builtin_is(lenv *e, lval *a) {
-    LASSERT_ARGC("equal?", a, 2);
+    LASSERT_ARGC("is?", a, 2);
 
     lval *v = a->val.cell[1];
     lval *w = lval_take(a, 0);
     return lval_lng(lval_is(v, w));
+}
+
+lval *builtin_is_str(lenv *e, lval *a) {
+    LASSERT_ARGC("string?", a, 1);
+
+    lval *v = lval_bool(a->val.cell[0]->type == LVAL_STR);
+    lval_del(a);
+    return v;
+}
+
+lval *builtin_is_lng(lenv *e, lval *a) {
+    LASSERT_ARGC("integer?", a, 1);
+
+    lval *v = lval_bool(a->val.cell[0]->type == LVAL_LNG);
+    lval_del(a);
+    return v;
+}
+
+lval *builtin_is_dbl(lenv *e, lval *a) {
+    LASSERT_ARGC("float?", a, 1);
+
+    lval *v = lval_bool(a->val.cell[0]->type == LVAL_DBL);
+    lval_del(a);
+    return v;
+}
+
+lval *builtin_is_bool(lenv *e, lval *a) {
+    LASSERT_ARGC("boolean?", a, 1);
+
+    lval *v = lval_bool(a->val.cell[0]->type == LVAL_BOOL);
+    lval_del(a);
+    return v;
+}
+
+lval *builtin_is_qexpr(lenv *e, lval *a) {
+    LASSERT_ARGC("list?", a, 1);
+
+    lval *v = lval_bool(a->val.cell[0]->type == LVAL_QEXPR);
+    lval_del(a);
+    return v;
+}
+
+lval *builtin_is_sexpr(lenv *e, lval *a) {
+    LASSERT_ARGC("expr?", a, 1);
+
+    lval *v = lval_bool(a->val.cell[0]->type == LVAL_SEXPR);
+    lval_del(a);
+    return v;
+}
+
+lval *builtin_is_err(lenv *e, lval *a) {
+    LASSERT_ARGC("error?", a, 1);
+
+    lval *v = lval_bool(a->val.cell[0]->type == LVAL_ERR);
+    lval_del(a);
+    return v;
+}
+
+lval *builtin_is_proc(lenv *e, lval *a) {
+    LASSERT_ARGC("procedure?", a, 1);
+
+    lval *v = lval_bool(a->val.cell[0]->type == LVAL_PROC);
+    lval_del(a);
+    return v;
+}
+
+lval *builtin_is_builtin(lenv *e, lval *a) {
+    LASSERT_ARGC("builtin?", a, 1);
+
+    lval *v = lval_bool(a->val.cell[0]->type == LVAL_BUILTIN);
+    lval_del(a);
+    return v;
 }
 
 lval *builtin_and(lenv *e, lval *a) {
@@ -1164,6 +1248,15 @@ void add_builtins(lenv *e) {
     add_builtin(e, "fun", builtin_fun);
     add_builtin(e, "equal?", builtin_equal);
     add_builtin(e, "is?", builtin_is);
+    add_builtin(e, "string?", builtin_is_str);
+    add_builtin(e, "integer?", builtin_is_lng);
+    add_builtin(e, "float?", builtin_is_dbl);
+    add_builtin(e, "boolean?", builtin_is_bool);
+    add_builtin(e, "list?", builtin_is_qexpr);
+    add_builtin(e, "expr?", builtin_is_sexpr);
+    add_builtin(e, "error?", builtin_is_err);
+    add_builtin(e, "procedure?", builtin_is_proc);
+    add_builtin(e, "builtin?", builtin_is_builtin);
     add_builtin(e, "\\", builtin_lambda);
     add_builtin(e, "apply", builtin_apply);
     add_builtin(e, "error", builtin_error);
@@ -1179,6 +1272,7 @@ void add_builtins(lenv *e) {
     add_builtin(e, "len", builtin_len);
     add_builtin(e, "head", builtin_head);
     add_builtin(e, "tail", builtin_tail);
+    add_builtin(e, "set-head!", builtin_set_head);
     add_builtin(e, "init", builtin_init);
     add_builtin(e, "last", builtin_last);
     add_builtin(e, "nth", builtin_nth);
