@@ -23,3 +23,24 @@
 
 (fun {map op lst}
      {(fold (\ {x acc} {(cons (op x) acc)}) {} lst)})
+
+(fun {do exprs} {((\ {} exprs))})
+
+; Used to create a new lexical scope with the given bindings
+; (let {(x (+ 3 4)) (y 6)} {(*x y)})
+(fun {let vars body} {
+    ((\ {v b}
+        {(apply (\ (map head vars) body)
+                (map (\ {v} {(nth v 1)}) vars))})
+     vars body)})
+
+; Like lets, put temporarily changes a global binding instead of creating
+; a new lexical binding
+(fun {let* vars body} {
+    (let {(let*-saved (map (\ {v} {(eval (head v))}) vars))
+          (let*-symbols (map head vars))
+          (let*-vals (map (\ {v} {(do (tail v))}) vars))}
+         {(apply def* (join (list let*-symbols) let*-vals))
+          (def {result} body)
+          (apply def* (join (list let*-symbols) let*-saved))
+          result})})
