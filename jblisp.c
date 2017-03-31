@@ -19,11 +19,13 @@
     if (args->val.cell[idx]->type != exp_type) {                           \
         lval *err = lval_err(                                              \
             "Procedure '%s' expected argument %i of type '%s', got '%s'.", \
-            fname, idx, TYPE_NAMES[exp_type],                              \
+            fname, idx+1, TYPE_NAMES[exp_type],                            \
             TYPE_NAMES[args->val.cell[idx]->type]);                        \
         lval_del(args);                                                    \
         return err;                                                        \
     }
+
+// #define JBLISPC_DEBUG_ENV
 
 // JBLisp builtin types
 enum { LVAL_BOOL, LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM, LVAL_STR,
@@ -144,6 +146,9 @@ void lenv_put(lenv *e, char *sym, lval *v) {
 }
 
 lval *lenv_get(lenv *e, char *sym) {
+#ifdef JBLISPC_DEBUG_ENV
+    printf("looking for symbol '%s' in env '%p'\n", sym, e);
+#endif
     for (int i=0; i < e->count; i++) {
         if (strcmp(e->syms[i], sym) == 0) {
             return lval_copy(e->vals[i]);
@@ -1139,6 +1144,9 @@ lval *builtin_lambda(lenv *e, lval *a) {
     lval *q = lval_take(a, 0);
     lval *v = lval_proc();
     v->val.proc->closure = e;
+#ifdef JBLISPC_DEBUG_ENV
+    printf("created lambda pointing to env at %p\n", (void*) e);
+#endif
     v->val.proc->params = syms;
     v->val.proc->body = q;
     return v;
@@ -1328,6 +1336,11 @@ lval *lval_eval_qexpr(lenv *e, lval *body) {
 }
 
 lval *lval_eval_sexpr(lenv *e, lval *v) {
+#ifdef JBLISPC_DEBUG_ENV
+        puts("evaluating: ");
+        lval_print(lval_copy(v));
+        printf(" in environment at %p\n", (void*) e);
+#endif
     // Special case: empty sexpr evaluates to itself
     if (v->count == 0) { return v; }
 
