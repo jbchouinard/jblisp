@@ -39,6 +39,7 @@ int main(int argc, char **argv) {
         free(input);
     }
 
+#ifdef JBLISPC_DEBUG_MEM
     for (int i=0; i < (COUNT_LENVNEW+COUNT_LENVCPY); i++) {
         lenv_del(LENVS[i]);
     }
@@ -55,6 +56,7 @@ int main(int argc, char **argv) {
     printf("LENVs copied: %li\n", COUNT_LENVCPY);
     printf("LENVs deleted: %li\n", COUNT_LENVDEL);
     printf("LENVs left: %li\n\n", COUNT_LENVNEW+COUNT_LENVCPY-COUNT_LENVDEL);
+#endif
 
     cleanup_parser();
     return 0;

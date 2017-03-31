@@ -5,6 +5,10 @@
 
 #define VERSION "0.6.0"
 
+// #define JBLISPC_DEBUG_ENV
+// #define JBLISPC_DEBUG_MEM
+
+#ifdef JBLISPC_DEBUG_MEM
 extern long COUNT_LVALCPY;
 extern long COUNT_LVALNEW;
 extern long COUNT_LVALDEL;
@@ -14,6 +18,7 @@ extern long COUNT_LPROCDEL;
 extern long COUNT_LENVCPY;
 extern long COUNT_LENVNEW;
 extern long COUNT_LENVDEL;
+#endif
 
 typedef struct _lval lval;
 typedef struct _lenv lenv;

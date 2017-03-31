@@ -25,8 +25,8 @@
         return err;                                                        \
     }
 
-// #define JBLISPC_DEBUG_ENV
 
+#ifdef JBLISPC_DEBUG_MEM
 long COUNT_LENVNEW;
 long COUNT_LENVCPY;
 long COUNT_LENVDEL;
@@ -37,6 +37,7 @@ long COUNT_LVALNEW;
 long COUNT_LVALCPY;
 long COUNT_LVALDEL;
 lenv *LENVS[1000];
+#endif
 
 // JBLisp builtin types
 enum { LVAL_BOOL, LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM, LVAL_STR,
@@ -76,7 +77,9 @@ struct _lenv {
 };
 
 lproc *lproc_new() {
+#ifdef JBLISPC_DEBUG_MEM
     COUNT_LPROCNEW++;
+#endif
     lproc *p = malloc(sizeof(lproc));
     p->params = NULL;
     p->body = NULL;
@@ -85,7 +88,9 @@ lproc *lproc_new() {
 }
 
 lproc *lproc_copy(lproc *p) {
+#ifdef JBLISPC_DEBUG_MEM
     COUNT_LPROCCPY++;
+#endif
     lproc *v = malloc(sizeof(lproc));
     v->closure = p->closure;
     v->params = lval_copy(p->params);
@@ -94,7 +99,9 @@ lproc *lproc_copy(lproc *p) {
 }
 
 void lproc_del(lproc *p) {
+#ifdef JBLISPC_DEBUG_MEM
     COUNT_LPROCDEL++;
+#endif
     if (p->params != NULL) {
         lval_del(p->params);
     }
@@ -106,8 +113,10 @@ void lproc_del(lproc *p) {
 
 lenv *lenv_new(lenv *enc) {
     lenv *e = malloc(sizeof(lenv));
+#ifdef JBLISPC_DEBUG_MEM
     LENVS[COUNT_LENVNEW+COUNT_LENVCPY] = e;
     COUNT_LENVNEW++;
+#endif
     e->count = 0;
     e->size = 0;
     e->encl = enc;
@@ -118,8 +127,10 @@ lenv *lenv_new(lenv *enc) {
 
 lenv *lenv_copy(lenv *e) {
     lenv *n = malloc(sizeof(lenv));
+#ifdef JBLISPC_DEBUG_MEM
     LENVS[COUNT_LENVNEW+COUNT_LENVCPY] = n;
     COUNT_LENVCPY++;
+#endif
     n->encl = e->encl;
     n->count = e->count;
     n->size = e->count;
@@ -134,7 +145,9 @@ lenv *lenv_copy(lenv *e) {
 }
 
 void lenv_del(lenv *e) {
+#ifdef JBLISPC_DEBUG_MEM
     COUNT_LENVDEL++;
+#endif
     for (int i=0; i < e->count; i++) {
         free(e->syms[i]);
         lval_del(e->vals[i]);
@@ -180,7 +193,9 @@ lval *lenv_get(lenv *e, char *sym) {
 }
 
 lval *lval_new() {
+#ifdef JBLISPC_DEBUG_MEM
     COUNT_LVALNEW++;
+#endif
     lval *v = malloc(sizeof(lval));
     v->count = 0;
     v->size = 0;
@@ -338,7 +353,9 @@ int lval_is_true(lval *v) {
 }
 
 void lval_del(lval *v) {
+#ifdef JBLISPC_DEBUG_MEM
     COUNT_LVALDEL++;
+#endif
     switch(v->type) {
         case LVAL_BOOL:
         case LVAL_DBL:
@@ -364,7 +381,9 @@ void lval_del(lval *v) {
 }
 
 lval *lval_copy(lval *v) {
+#ifdef JBLISPC_DEBUG_MEM
     COUNT_LVALCPY++;
+#endif
     lval *x = malloc(sizeof(lval));
     x->type = v->type;
     x->size = v->size;
