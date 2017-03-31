@@ -1150,15 +1150,7 @@ lval *builtin_apply(lenv *e, lval *a) {
     LASSERT_ARGC("apply", a, 2);
     lval *proc = lval_pop(a, 0);
     a = lval_take(a, 0);
-    if (a->type != LVAL_QEXPR) {
-        lval_del(proc);
-        lval_del(a);
-        return lval_err(
-            "Builtin 'apply' expected argument 2 of type 'q-expression'");
-    }
-    lval_insert(a, proc, 0);
-    a->type = LVAL_SEXPR;
-    return lval_eval(e, a);
+    return lval_call(e, proc, a);
 }
 
 lval *builtin_error(lenv *e, lval *a) {
@@ -1356,26 +1348,26 @@ lval *lval_eval_sexpr(lenv *e, lval *v) {
         }
     }
 
-    lval *result;
-    if (procval->type == LVAL_BUILTIN) {
-        result = procval->val.builtin(e, v);
-        lval_del(procval);
-    } else if (procval->type == LVAL_PROC) {
-        result = lval_call(e, procval, v);
-    } else if (procval->type == LVAL_ERR) {
-        lval_del(v);
-        return procval;
-    } else {
-        result = lval_err(
-            "Object of type '%s' is not applicable.",
-            TYPE_NAMES[procval->type]);
-        lval_del(procval);
-        lval_del(v);
-    }
-    return result;
+    return lval_call(e, procval, v);
 }
 
 lval *lval_call(lenv *e, lval *proc, lval *args) {
+    if (proc->type == LVAL_BUILTIN) {
+        lval *result = proc->val.builtin(e, args);
+        lval_del(proc);
+        return result;
+    }
+    if (proc->type == LVAL_ERR) {
+        lval_del(args);
+        return proc;
+    }
+    if (proc->type != LVAL_PROC) {
+        lval_del(args);
+        lval *repr = lval_repr(proc);
+        lval *err = lval_err("Object '%s' is not applicable.", repr->val.str);
+        lval_del(repr);
+        return err;
+    }
     // Set up closure
     lproc *p = proc->val.proc;
     lenv *closure = lenv_new(p->closure);
