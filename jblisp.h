@@ -89,7 +89,7 @@ lval *lval_read(mpc_ast_t*);
 lval *lval_read_num(mpc_ast_t*);
 
 lval *lval_eval(lenv*, lval*);
-lval *lval_eval_qexpr(lenv*, lval*);
+lval *lval_do(lenv*, lval*);
 lval *lval_eval_sexpr(lenv*, lval*);
 lval *lval_call(lenv*, lval*, lval*);
 

@@ -32,7 +32,7 @@ enum { LVAL_BOOL, LVAL_LNG, LVAL_DBL, LVAL_ERR, LVAL_SYM, LVAL_STR,
        LVAL_BUILTIN, LVAL_PROC, LVAL_SEXPR, LVAL_QEXPR };
 char *TYPE_NAMES[] = {
     "boolean", "integer", "float", "error", "symbol", "string",
-    "builtin", "procedure", "S-expression", "Q-expression"
+    "builtin", "procedure", "list", "quoted list"
 };
 
 struct _lval {
@@ -792,7 +792,7 @@ lval *builtin_eq(lenv *e, lval *a) {
 
 lval *builtin_nth(lenv *e, lval *a) {
     LASSERT_ARGC("nth", a, 2)
-    LASSERT_ARGT("nth", a, 0, LVAL_QEXPR);
+    LASSERT_ARGT("nth", a, 0, LVAL_SEXPR);
     LASSERT_ARGT("nth", a, 1, LVAL_LNG);
     LASSERT(a, a->val.cell[0]->count != 0,
         "Procedure 'nth' undefined on empty list '{}'.");
@@ -813,7 +813,7 @@ lval *builtin_nth(lenv *e, lval *a) {
 
 lval *builtin_head(lenv *e, lval *a) {
     LASSERT_ARGC("head", a, 1);
-    LASSERT_ARGT("head", a, 0, LVAL_QEXPR);
+    LASSERT_ARGT("head", a, 0, LVAL_SEXPR);
     LASSERT(a, a->val.cell[0]->count != 0,
         "Procedure 'head' undefined on empty list '{}'.");
 
@@ -824,8 +824,8 @@ lval *builtin_head(lenv *e, lval *a) {
 
 lval *builtin_tail(lenv *e, lval *a) {
     LASSERT_ARGC("tail", a, 1)
-    LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Type Error - procedure 'tail' expected a Q expression.");
+    LASSERT(a, a->val.cell[0]->type == LVAL_SEXPR,
+        "Type Error - procedure 'tail' expected a list.");
     LASSERT(a, a->val.cell[0]->count != 0,
         "Procedure 'tail' undefined on empty list '{}'.");
 
@@ -837,8 +837,8 @@ lval *builtin_tail(lenv *e, lval *a) {
 
 lval *builtin_set_head(lenv *e, lval *a) {
     LASSERT_ARGC("set-head!", a, 2)
-    LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Procedure 'tail' expected a Q expression as argument 2.");
+    LASSERT(a, a->val.cell[0]->type == LVAL_SEXPR,
+        "Procedure 'tail' expected a list as argument 2.");
 
     lval *lst = lval_pop(a, 0);
     lval *v = lval_take(a, 0);
@@ -848,19 +848,13 @@ lval *builtin_set_head(lenv *e, lval *a) {
 }
 
 lval *builtin_list(lenv *e, lval *a) {
-    LASSERT(a, a->type == LVAL_SEXPR,
-        "Procedure 'list' expected an S expression");
-    a->type = LVAL_QEXPR;
     return a;
 }
 
 lval *builtin_eval(lenv *e, lval *a) {
     LASSERT_ARGC("eval", a, 1);
-    LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Procedure 'eval' expected a Q expression");
 
     lval *x = lval_take(a, 0);
-    x->type = LVAL_SEXPR;
     return lval_eval(e, x);
 }
 
@@ -877,8 +871,8 @@ lval *builtin_join(lenv *e, lval *a) {
     LASSERT(a, a->count != 0,
         "Procedure 'join' takes at least 1 argument.");
     for (int i=0; i < a->count; i++) {
-        LASSERT(a, a->val.cell[i]->type == LVAL_QEXPR,
-            "Procedure 'join' takes only Q expression arguments.");
+        LASSERT(a, a->val.cell[i]->type == LVAL_SEXPR,
+            "Procedure 'join' takes only lists as arguments.");
     }
 
     lval *x = lval_pop(a, 0);
@@ -894,8 +888,8 @@ lval *builtin_join(lenv *e, lval *a) {
 
 lval *builtin_cons(lenv *e, lval *a) {
     LASSERT_ARGC("cons", a, 2);
-    LASSERT(a, a->val.cell[1]->type == LVAL_QEXPR,
-        "Second argument to 'cons' must be a Q expression.");
+    LASSERT(a, a->val.cell[1]->type == LVAL_SEXPR,
+        "Second argument to 'cons' must be a list.");
     lval *x = lval_pop(a, 0);
     lval *q = lval_take(a, 0);
     q = lval_insert(q, x, 0);
@@ -904,8 +898,8 @@ lval *builtin_cons(lenv *e, lval *a) {
 
 lval *builtin_len(lenv *e, lval *a) {
     LASSERT_ARGC("len", a, 1);
-    LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Procedure 'len' only applies to Q expressions.");
+    LASSERT(a, a->val.cell[0]->type == LVAL_SEXPR,
+        "Procedure 'len' only applies to lists.");
     lval *x = lval_lng(a->val.cell[0]->count);
     lval_del(a);
     return x;
@@ -913,8 +907,8 @@ lval *builtin_len(lenv *e, lval *a) {
 
 lval *builtin_init(lenv *e, lval *a) {
     LASSERT_ARGC("init", a, 1);
-    LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Procedure 'init' only applies to Q expressions.");
+    LASSERT(a, a->val.cell[0]->type == LVAL_SEXPR,
+        "Procedure 'init' only applies to lists.");
 
     // Keep all but first cell
     lval *x = lval_take(a, 0);
@@ -924,8 +918,8 @@ lval *builtin_init(lenv *e, lval *a) {
 
 lval *builtin_last(lenv *e, lval *a) {
     LASSERT_ARGC("last", a, 1);
-    LASSERT(a, a->val.cell[0]->type == LVAL_QEXPR,
-        "Procedure 'last' only applies to Q expressions.");
+    LASSERT(a, a->val.cell[0]->type == LVAL_SEXPR,
+        "Procedure 'last' only applies to lists.");
 
     lval *x = lval_take(a, 0);
     return lval_take(x, x->count-1);
@@ -980,7 +974,7 @@ lval *builtin_is_bool(lenv *e, lval *a) {
 }
 
 lval *builtin_is_qexpr(lenv *e, lval *a) {
-    LASSERT_ARGC("list?", a, 1);
+    LASSERT_ARGC("quoted-list?", a, 1);
 
     lval *v = lval_bool(a->val.cell[0]->type == LVAL_QEXPR);
     lval_del(a);
@@ -988,7 +982,7 @@ lval *builtin_is_qexpr(lenv *e, lval *a) {
 }
 
 lval *builtin_is_sexpr(lenv *e, lval *a) {
-    LASSERT_ARGC("expr?", a, 1);
+    LASSERT_ARGC("list?", a, 1);
 
     lval *v = lval_bool(a->val.cell[0]->type == LVAL_SEXPR);
     lval_del(a);
@@ -1060,7 +1054,7 @@ lval *builtin_not(lenv *e, lval *a) {
 lval *builtin_def(lenv *e, lval *a) {
     LASSERT(a, a->count > 1,
             "Builtin 'def' expected at least 2 arguments.");
-    LASSERT_ARGT("def", a, 0, LVAL_QEXPR);
+    LASSERT_ARGT("def", a, 0, LVAL_SEXPR);
 
     lval *ks = lval_pop(a, 0);
 
@@ -1097,8 +1091,8 @@ lval *builtin_def_global(lenv *e, lval *a) {
 // how lexical scoping is currenctly implemented
 lval *builtin_fun(lenv *e, lval *a) {
     LASSERT_ARGC("fun", a, 2);
-    LASSERT_ARGT("fun", a, 0, LVAL_QEXPR);
-    LASSERT_ARGT("fun", a, 1, LVAL_QEXPR);
+    LASSERT_ARGT("fun", a, 0, LVAL_SEXPR);
+    LASSERT_ARGT("fun", a, 1, LVAL_SEXPR);
 
     lval *syms = lval_pop(a, 0);
     for (int i=0; i < syms->count; i++) {
@@ -1109,7 +1103,7 @@ lval *builtin_fun(lenv *e, lval *a) {
         }
     }
     lval *adef = lval_sexpr();
-    lval *defsym = lval_qexpr();
+    lval *defsym = lval_sexpr();
     lval_add(defsym, lval_pop(syms, 0));
     lval_add(adef, defsym);
 
@@ -1129,8 +1123,8 @@ lval *builtin_fun(lenv *e, lval *a) {
 
 lval *builtin_lambda(lenv *e, lval *a) {
     LASSERT_ARGC("lambda", a, 2);
-    LASSERT_ARGT("lambda", a, 0, LVAL_QEXPR);
-    LASSERT_ARGT("lambda", a, 1, LVAL_QEXPR);
+    LASSERT_ARGT("lambda", a, 0, LVAL_SEXPR);
+    LASSERT_ARGT("lambda", a, 1, LVAL_SEXPR);
 
     lval *syms = lval_pop(a, 0);
     for (int i=0; i < syms->count; i++) {
@@ -1209,8 +1203,8 @@ lval *builtin_concat(lenv *e, lval *a) {
 
 lval *builtin_if(lenv *e, lval *a) {
     LASSERT_ARGC("if", a, 3);
-    LASSERT_ARGT("if", a, 1, LVAL_QEXPR);
-    LASSERT_ARGT("if", a, 2, LVAL_QEXPR);
+    LASSERT_ARGT("if", a, 1, LVAL_SEXPR);
+    LASSERT_ARGT("if", a, 2, LVAL_SEXPR);
 
     lval *expr;
     if (lval_is_true(a->val.cell[0])) {
@@ -1218,14 +1212,14 @@ lval *builtin_if(lenv *e, lval *a) {
     } else {
         expr = lval_take(a, 2);
     }
-    return lval_eval_qexpr(e, expr);
+    return lval_do(e, expr);
 }
 
 lval *builtin_cond(lenv *e, lval *a) {
     for (int i=0; i < a->count; i++) {
-        if (a->val.cell[i]->type != LVAL_QEXPR) {
+        if (a->val.cell[i]->type != LVAL_SEXPR) {
             lval_del(a);
-            return lval_err("'cond' expected q-expression arguments only");
+            return lval_err("'cond' expected lists arguments only.");
         }
     }
     while (a->count) {
@@ -1234,7 +1228,7 @@ lval *builtin_cond(lenv *e, lval *a) {
         if (lval_is_true(pred)) {
             lval_del(pred);
             lval_del(a);
-            return lval_eval_qexpr(e, cond);
+            return lval_do(e, cond);
         }
         lval_del(cond);
         lval_del(pred);
@@ -1260,8 +1254,8 @@ void add_builtins(lenv *e) {
     add_builtin(e, "integer?", builtin_is_lng);
     add_builtin(e, "float?", builtin_is_dbl);
     add_builtin(e, "boolean?", builtin_is_bool);
-    add_builtin(e, "list?", builtin_is_qexpr);
-    add_builtin(e, "expr?", builtin_is_sexpr);
+    add_builtin(e, "quoted-list?", builtin_is_qexpr);
+    add_builtin(e, "list?", builtin_is_sexpr);
     add_builtin(e, "error?", builtin_is_err);
     add_builtin(e, "procedure?", builtin_is_proc);
     add_builtin(e, "builtin?", builtin_is_builtin);
@@ -1312,8 +1306,12 @@ lval *lval_eval(lenv *e, lval *v) {
             lval_del(v);
             break;
         case LVAL_SEXPR:
-             x = lval_eval_sexpr(e, v);
-             break;
+            x = lval_eval_sexpr(e, v);
+            break;
+        case LVAL_QEXPR:
+            x = v;
+            x->type = LVAL_SEXPR;
+            break;
         default:
             x = v;
             break;
@@ -1321,9 +1319,9 @@ lval *lval_eval(lenv *e, lval *v) {
     return x;
 }
 
-// Evaluate each statement in a Q-expression
+// Evaluate each statement in a list
 // Returns result of the last expression.
-lval *lval_eval_qexpr(lenv *e, lval *body) {
+lval *lval_do(lenv *e, lval *body) {
     lval* result = NULL;
     if (body->count == 0) { result = lval_sexpr(); }
     while (body->count) {
@@ -1386,7 +1384,7 @@ lval *lval_call(lenv *e, lval *proc, lval *args) {
         lval *par = lval_pop(p->params, 0);
         lval *arg;
         // Special syntax for arg list like {x & xs}
-        // All remaining args go in a qexpr in xs
+        // All remaining args go in a list in xs
         if (strcmp(par->val.str, "&") == 0) {
             lval_del(par);
             if (p->params->count != 1) {
@@ -1397,8 +1395,8 @@ lval *lval_call(lenv *e, lval *proc, lval *args) {
             }
             par = lval_pop(p->params, 0);
             arg = args;
-            arg->type = LVAL_QEXPR;
-            args = lval_qexpr();
+            arg->type = LVAL_SEXPR;
+            args = lval_sexpr();
         } else {
             arg = lval_pop(args, 0);
         }
@@ -1413,7 +1411,7 @@ lval *lval_call(lenv *e, lval *proc, lval *args) {
         return lval_err("Wrong number of arguments to lambda.");
     }
     // Evaluate body
-    lval *res = lval_eval_qexpr(closure, p->body);
+    lval *res = lval_do(closure, p->body);
     p->body = NULL;
     lval_del(proc);
     lval_del(args);
