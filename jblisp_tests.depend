@@ -1,0 +1,28 @@
+# depslib dependency file v1.0
+1490739431 source:/home/jerome/projects/cs/jblisp/jblisp.c
+	<math.h>
+	"mpc.h"
+	"jblisp.h"
+
+1490104719 /home/jerome/projects/cs/jblisp/mpc.h
+	<stdlib.h>
+	<stdio.h>
+	<stdarg.h>
+	<string.h>
+	<math.h>
+	<errno.h>
+	<ctype.h>
+
+1490739431 /home/jerome/projects/cs/jblisp/jblisp.h
+	"mpc.h"
+
+1490104719 source:/home/jerome/projects/cs/jblisp/mpc.c
+	"mpc.h"
+
+1490666771 source:/home/jerome/projects/cs/jblisp/tests/test.c
+	<stdio.h>
+	"../jblisp.h"
+	"../minunit.h"
+
+1490222589 /home/jerome/projects/cs/jblisp/minunit.h
+
