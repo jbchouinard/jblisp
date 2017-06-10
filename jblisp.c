@@ -532,7 +532,7 @@ lval *lval_read(mpc_ast_t *ast) {
 
 char *strencl(char *s, size_t n, char open, char close) {
     char *r = malloc(n+3);
-    memcpy((void*) r+1, (void*) s, n);
+    memcpy((void*) (r+1), (void*) s, n);
     r[0] = open;
     r[n+1] = close;
     r[n+2] = '\0';
@@ -1225,7 +1225,7 @@ lval *builtin_concat(lenv *e, lval *a) {
     for (int i=0; i < a->count; i++) {
         lval *v = a->val.cell[i];
         res->val.str = realloc(res->val.str, count + v->count + 1);
-        memcpy((void*) res->val.str + count, v->val.str, v->count);
+        memcpy((void*) (res->val.str + count), v->val.str, v->count);
         count += v->count;
     }
     res->count = count;
