@@ -90,7 +90,7 @@
     "COND: Should evaluate to 'baz'")
 
 ; Let
-(assert-equal 17 (let {(x 5) (y 12)} {(+ x y)})
-    "LET: Should evaluate to 17")
-(assert-equal 25 (let {(m 12)} {(let {(n 13)} {(+ m n)})})
-    "LET: Should evaluate to 25")
+; (assert-equal 17 (let {(x 5) (y 12)} {(+ x y)})
+;     "LET: Should evaluate to 17")
+; (assert-equal 25 (let {(m 12)} {(let {(n 13)} {(+ m n)})})
+;     "LET: Should evaluate to 25")

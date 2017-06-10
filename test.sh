@@ -1,8 +1,8 @@
 echo "RUNNING C TESTS..."
 echo ""
-./build/test
+./bin/test
 echo ""
 echo ""
 echo "RUNNING LISP TESTS..."
 echo ""
-./build/jblisp --stop tests/test.jbl
+./bin/jblisp --stop tests/test.jbl
