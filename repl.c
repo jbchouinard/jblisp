@@ -1,5 +1,4 @@
 #include <editline/readline.h>
-#include <editline/history.h>
 
 #include "mpc.h"
 #include "jblisp.h"
