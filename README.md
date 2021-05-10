@@ -1,4 +1,4 @@
-# jblisp
+# JBLisp
 
 A small dialect of Lisp.
 
